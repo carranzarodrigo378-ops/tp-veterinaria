@@ -33,6 +33,7 @@ classDiagram
         +int id
         +string nombre
         +string especie
+        +string raza
         +date fechaNacimiento
         +int clienteId
     }

@@ -1,18 +1,18 @@
 from pydantic import BaseModel, EmailStr
 
 
-class ClienteBase(BaseModel):
+class ClienteSchema(BaseModel):
     nombre: str
     apellido: str
     dni: str
     telefono: str
-    email: str
+    email: EmailStr     
     direccion: str = ""
 
 
-class ClienteCrear(ClienteBase):
+class ClienteCrear(ClienteSchema):
     pass
 
 
-class ClienteRespuesta(ClienteBase):
+class ClienteRespuesta(ClienteSchema):
     id_cliente: int
