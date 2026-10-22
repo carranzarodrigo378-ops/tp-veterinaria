@@ -13,6 +13,10 @@ class MuestraBase(BaseModel):
 class MuestraCrear(MuestraBase):
     pass
 
+class MuestraDespachar(BaseModel):
+    responsable: str | None = None
+    observaciones: str | None = None
+
 class MuestraEmpaquetar(BaseModel):
     remito_id: int
 
