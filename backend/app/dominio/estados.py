@@ -1,87 +1,98 @@
 from abc import ABC, abstractmethod
+from app.esquemas.enums import EstadoMuestra
 
 
 class ExcepcionTransicionEstado(Exception):
-    """Excepción para transiciones no válidas según las reglas del negocio."""
+    """Excepción lanzada cuando se intenta una transición no válida según el patrón State."""
     pass
 
 
-# Interfaz base del Patrón State
-class EstadoMuestra(ABC):
+class EstadoMuestraBase(ABC):
     @property
     @abstractmethod
-    def nombre(self):
-        """Nombre descriptivo del estado actual."""
+    def nombre(self) -> str:
+        """Devuelve el valor exacto del enum EstadoMuestra."""
         pass
 
-    def empaquetar(self, muestra, id_conservadora, nro_precinto):
-        raise ExcepcionTransicionEstado(f"No se puede empaquetar una muestra en estado '{self.nombre}'.")
+    def empaquetar(self, muestra, id_conservadora: str, nro_precinto: str):
+        raise ExcepcionTransicionEstado(
+            f"Transición no permitida: no se puede empaquetar una muestra en estado '{self.nombre}'."
+        )
 
-    def despachar(self, muestra, transporte_info):
-        raise ExcepcionTransicionEstado(f"No se puede despachar una muestra en estado '{self.nombre}'.")
+    def despachar(self, muestra, transporte_info: str):
+        raise ExcepcionTransicionEstado(
+            f"Transición no permitida: no se puede despachar una muestra en estado '{self.nombre}'."
+        )
 
-    def recibir_en_laboratorio(self, muestra, precinto_intacto, observaciones=""):
-        raise ExcepcionTransicionEstado(f"No se puede recibir en laboratorio una muestra en estado '{self.nombre}'.")
+    def recibir(self, muestra, precinto_intacto: bool, observaciones: str = ""):
+        raise ExcepcionTransicionEstado(
+            f"Transición no permitida: no se puede recibir una muestra en estado '{self.nombre}'."
+        )
 
-    def registrar_analisis(self, muestra, resultado_id):
-        raise ExcepcionTransicionEstado(f"No se puede registrar análisis de una muestra en estado '{self.nombre}'.")
+    def analizar(self, muestra, resultado_id: str):
+        raise ExcepcionTransicionEstado(
+            f"Transición no permitida: no se puede registrar análisis en una muestra en estado '{self.nombre}'."
+        )
 
 
-# Estados Concretos
-
-class EstadoExtraida(EstadoMuestra):
+class EstadoExtraida(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "Extraída"
+    def nombre(self) -> str:
+        return EstadoMuestra.extraida.value
 
-    def empaquetar(self, muestra, id_conservadora, nro_precinto):
+    def empaquetar(self, muestra, id_conservadora: str, nro_precinto: str):
         muestra.id_conservadora = id_conservadora
         muestra.nro_precinto = nro_precinto
-        muestra.cambiar_estado(EstadoEmpaquetada(), motivo=f"Empaquetada en conservadora {id_conservadora} con precinto {nro_precinto}")
+        motivo = f"Acondicionada en conservadora {id_conservadora} con precinto {nro_precinto}"
+        muestra.cambiar_estado(EstadoEmpaquetada(), motivo)
 
 
-class EstadoEmpaquetada(EstadoMuestra):
+class EstadoEmpaquetada(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "Empaquetada"
+    def nombre(self) -> str:
+        return EstadoMuestra.empaquetada.value
 
-    def despachar(self, muestra, transporte_info):
+    def despachar(self, muestra, transporte_info: str):
         muestra.transporte_info = transporte_info
-        muestra.cambiar_estado(EstadoEnTransito(), motivo=f"Despachada hacia laboratorio central via {transporte_info}")
+        motivo = f"Despachada hacia el Laboratorio Central. Transporte: {transporte_info}"
+        muestra.cambiar_estado(EstadoEnTransito(), motivo)
 
 
-class EstadoEnTransito(EstadoMuestra):
+class EstadoEnTransito(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "En tránsito"
+    def nombre(self) -> str:
+        return EstadoMuestra.en_transito.value
 
-    def recibir_en_laboratorio(self, muestra, precinto_intacto, observaciones=""):
-        # Validación obligatoria: si el precinto llega roto, la muestra se rechaza
-        if not precinto_intacto:
-            detalle = f"RECHAZADA: Precinto violado o roto. {observaciones}".strip()
-            muestra.cambiar_estado(EstadoRechazada(), motivo=detalle)
+    def recibir(self, muestra, precinto_intacto: bool, observaciones: str = ""):
+        # Regla de negocio: Si el precinto llega roto, pasa a rechazada directamente
+        if precinto_intacto:
+            motivo = f"Muestra recibida en laboratorio. Precinto verificado intacto. {observaciones}".strip()
+            muestra.cambiar_estado(EstadoRecibida(), motivo)
         else:
-            detalle = f"Recepción conforme. Precinto íntegro. {observaciones}".strip()
-            muestra.cambiar_estado(EstadoRecibida(), motivo=detalle)
+            motivo = f"RECHAZADA: Precinto de seguridad roto o violentado. {observaciones}".strip()
+            muestra.cambiar_estado(EstadoRechazada(), motivo)
 
 
-class EstadoRecibida(EstadoMuestra):
+class EstadoRecibida(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "Recibida"
+    def nombre(self) -> str:
+        return EstadoMuestra.recibida.value
 
-    def registrar_analisis(self, muestra, resultado_id):
+    def analizar(self, muestra, resultado_id: str):
         muestra.id_resultado = resultado_id
-        muestra.cambiar_estado(EstadoAnalizada(), motivo=f"Análisis completado con ID de resultado: {resultado_id}")
+        motivo = f"Análisis procesado exitosamente. Informe de resultado ID: {resultado_id}"
+        muestra.cambiar_estado(EstadoAnalizada(), motivo)
 
 
-class EstadoAnalizada(EstadoMuestra):
+class EstadoAnalizada(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "Analizada"
+    def nombre(self) -> str:
+        return EstadoMuestra.analizada.value
+    # Estado final: ciclo de análisis completado
 
 
-class EstadoRechazada(EstadoMuestra):
+class EstadoRechazada(EstadoMuestraBase):
     @property
-    def nombre(self):
-        return "Rechazada"
+    def nombre(self) -> str:
+        return EstadoMuestra.rechazada.value
+    # Estado final: la muestra descartada no admite más transiciones

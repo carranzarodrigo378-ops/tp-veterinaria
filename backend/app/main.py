@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.rutas import auth, muestras, clientes_mascotas
+from app.rutas import auth, muestras, clientes_mascotas, consultas, infraestructura, reportes
 
 app = FastAPI(
     title="Red de Clínicas Veterinarias y Laboratorio Central",
@@ -11,7 +11,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuración de CORS para comunicarse con el frontend de Vite
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
@@ -20,10 +19,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro de routers modulares
+# Registro de routers
 app.include_router(auth.router)
-app.include_router(muestras.router)
 app.include_router(clientes_mascotas.router)
+app.include_router(consultas.router)
+app.include_router(muestras.router)
+app.include_router(infraestructura.router)
+app.include_router(reportes.router)
 
 
 @app.get("/health", tags=["Salud"])
@@ -39,6 +41,7 @@ def inicio():
         "estado": "En línea",
         "documentacion": "/docs"
     }
+
 
 if __name__ == "__main__":
     import uvicorn
