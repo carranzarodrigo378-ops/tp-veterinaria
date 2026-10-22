@@ -1,10 +1,14 @@
 # app/persistencia/mascota_dao.py
-from app.persistencia.conexion import get_db_connection
+from app.persistencia.conexion import DatabaseSingleton
 from app.esquemas.mascotas import MascotaSchema
 
 class MascotaDAO:
+    def __init__(self):
+        # Obtenemos la instancia única de la base de datos
+        self.db = DatabaseSingleton()
+
     def crear(self, mascota: MascotaSchema):
-        conn= get_db_connection()
+        conn= self.db.get_conexion()
         cursor = conn.cursor()
         
         query = """
@@ -17,38 +21,34 @@ class MascotaDAO:
         conn.commit()  # Guardamos los cambios en la base de datos
         
         nuevo_id = cursor.lastrowid  # Obtenemos el ID de la mascota recién creada
-        conn.close()  # Cerramos la conexión a la base de datos
         return nuevo_id  # Retornamos el ID de la nueva mascota
     
     def obtener_todas(self):
-        conn = get_db_connection()
+        conn = self.db.get_conexion()
         cursor = conn.cursor()
         
         query = "SELECT * FROM mascotas"
         cursor.execute(query)
         
         mascotas = cursor.fetchall()  # Obtenemos todas las mascotas
-        conn.close()  # Cerramos la conexión a la base de datos
-        return mascotas  # Retornamos la lista de mascotas
+        return [dict(mascota) for mascota in mascotas] # Retornamos la lista de mascotas
     
     def obtener_por_id(self, id_mascota: int):
-        conn = get_db_connection()
+        conn = self.db.get_conexion()
         cursor = conn.cursor()
         
         query = "SELECT * FROM mascotas WHERE id_mascota = ?"
         cursor.execute(query, (id_mascota,))
         
         mascota = cursor.fetchone()  # Obtenemos la mascota con el ID especificado
-        conn.close()  # Cerramos la conexión a la base de datos
-        return mascota  # Retornamos la mascota encontrada (o None si no existe)
+        return dict(mascota) if mascota else "No se ha encontrado" # Retornamos la mascota encontrada (o None si no existe)
     
     def obtener_mascotas_por_cliente(self, id_cliente: int):
-        conn = get_db_connection()
+        conn = self.db.get_conexion()
         cursor = conn.cursor()
         
         query = "SELECT * FROM mascotas WHERE id_cliente = ?"
         cursor.execute(query, (id_cliente,))
         
         mascotas = cursor.fetchall()  # Obtenemos todas las mascotas del cliente
-        conn.close()  # Cerramos la conexión a la base de datos
-        return mascotas  # Retornamos la lista de mascotas del cliente
+        return [dict(mascota) for mascota in mascotas]  # Retornamos la lista de mascotas del cliente
