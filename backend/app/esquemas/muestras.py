@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from app.esquemas.enums import EstadoMuestra
+from app.esquemas.enums import EstadoMuestra, EstadoPrecinto  
 
 class MuestraBase(BaseModel):
     orden_derivacion_id: int
