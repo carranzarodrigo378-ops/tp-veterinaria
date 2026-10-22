@@ -1,14 +1,14 @@
 from datetime import date
 from pydantic import BaseModel
-
+from app.esquemas.enums import Sexo
 
 class MascotaBase(BaseModel):
     nombre: str
-    especie: str  # Ej: Canino, Felino
-    raza: str
-    fecha_nacimiento: date 
-    id_cliente: int  # Regla: toda mascota debe tener un responsable asociado
-
+    especie: str
+    raza: str | None = None
+    sexo: Sexo
+    fecha_nacimiento: date | None = None
+    id_cliente: int
 
 class MascotaCrear(MascotaBase):
     pass
