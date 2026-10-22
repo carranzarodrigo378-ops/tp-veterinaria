@@ -1,45 +1,29 @@
 import sqlite3
 
-from app.persistencia.conexion import DatabaseSingleton
-from app.esquemas.mascotas import MascotaCrear
+from app.esquemas.mascotas import MascotaActualizar, MascotaCrear
+from app.persistencia.base_dao import BaseDAO
+from app.persistencia.excepciones import ResponsableInexistenteError
 
 
-class MascotaDAO:
-    def __init__(self):
-        self.db = DatabaseSingleton()
+class MascotaDAO(BaseDAO):
+    TABLA = "mascotas"
+    PK = "id_mascota"
+    COLUMNAS_EDITABLES = {
+        "nombre", "especie", "raza", "sexo", "fecha_nacimiento", "id_cliente",
+    }
+
+    def _traducir_integridad(self, e: sqlite3.IntegrityError) -> ValueError:
+        if "FOREIGN KEY" in str(e):
+            return ResponsableInexistenteError("El cliente responsable no existe")
+        return super()._traducir_integridad(e)
 
     def crear(self, mascota: MascotaCrear) -> int:
-        conn = self.db.get_conexion()
-        query = """
-            INSERT INTO mascotas
-                (nombre, especie, raza, sexo, fecha_nacimiento, id_cliente)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """
-        try:
-            cursor = conn.execute(query, (
-                mascota.nombre,
-                mascota.especie,
-                mascota.raza,
-                mascota.sexo.value,
-                mascota.fecha_nacimiento.isoformat() if mascota.fecha_nacimiento else None,
-                mascota.id_cliente,
-            ))
-            conn.commit()
-        except sqlite3.IntegrityError:
-            conn.rollback()
-            raise ValueError("El cliente responsable no existe")
-        return cursor.lastrowid
+        return self._insertar(mascota.model_dump(mode="json"))
 
-    def obtener_todas(self) -> list[dict]:
-        cursor = self.db.get_conexion().execute("SELECT * FROM mascotas")
-        return [dict(fila) for fila in cursor.fetchall()]
-
-    def obtener_por_id(self, id_mascota: int) -> dict | None:
-        cursor = self.db.get_conexion().execute(
-            "SELECT * FROM mascotas WHERE id_mascota = ?", (id_mascota,)
+    def actualizar(self, id_mascota: int, datos: MascotaActualizar) -> bool:
+        return self._actualizar(
+            id_mascota, datos.model_dump(mode="json", exclude_unset=True)
         )
-        fila = cursor.fetchone()
-        return dict(fila) if fila else None
 
     def obtener_por_cliente(self, id_cliente: int) -> list[dict]:
         cursor = self.db.get_conexion().execute(
