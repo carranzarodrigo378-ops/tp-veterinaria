@@ -13,6 +13,9 @@ class MuestraBase(BaseModel):
 class MuestraCrear(MuestraBase):
     pass
 
+class MuestraEmpaquetar(BaseModel):
+    remito_id: int
+
 class MuestraActualizar(BaseModel):
     remito_id: int | None = None
     estado_actual: EstadoMuestra | None = None
