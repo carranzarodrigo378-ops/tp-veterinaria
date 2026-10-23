@@ -1,13 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 
-class LoginEsquema(BaseModel):
-    usuario: str
-    password: str
-
-
-class TokenRespuesta(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    usuario: str
-    rol: str
+class RegistroCliente(BaseModel):
+    usuario: str = Field(min_length=3, description="Nombre de usuario para iniciar sesión")
+    email: EmailStr = Field(description="Correo electrónico del cliente")
+    password: str = Field(min_length=6, description="Contraseña de acceso")
+    nombre: str = Field(min_length=1, description="Nombre de pila")
+    apellido: str = Field(min_length=1, description="Apellido")
+    telefono: str = Field(default="", description="Teléfono de contacto")
