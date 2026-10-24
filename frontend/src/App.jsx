@@ -3,6 +3,9 @@ import Login from './pages/Login';
 import HomeMenu from './pages/HomeMenu';
 import PetsPage from './pages/PetsPage';
 import TurnosPage from './pages/TurnosPage';
+import LaboratorioHub from './pages/LaboratorioHub';
+import LaboratorioPage from './pages/LaboratorioPage';
+import ReportesPage from './pages/ReportesPage';
 
 function App() {
   return (
@@ -12,6 +15,9 @@ function App() {
         <Route path="/home" element={<HomeMenu />} />
         <Route path="/mascotas" element={<PetsPage />} />
         <Route path="/turnos" element={<TurnosPage />} />
+        <Route path="/laboratorio-hub" element={<LaboratorioHub />} />
+        <Route path="/muestras" element={<LaboratorioPage />} />
+        <Route path="/reportes" element={<ReportesPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

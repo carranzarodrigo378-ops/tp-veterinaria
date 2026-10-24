@@ -6,27 +6,32 @@ const LaboratorioPage = () => {
   const role = localStorage.getItem('role') || 'cliente';
 
   const [muestras, setMuestras] = useState([]);
-  const [searchMode, setSearchMode] = useState('listado'); // 'listado' o 'codigo'
+  const [searchMode, setSearchMode] = useState('listado');
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    // Si un cliente intenta forzar la URL, lo enviamos de vuelta
-    if (role === 'cliente') {
-      navigate('/home');
+    // Expiración token 10 min
+    const expiration = localStorage.getItem('token_expiration');
+    if (!expiration || Date.now() > parseInt(expiration, 10) || role !== 'veterinario') {
+      navigate('/login');
       return;
     }
 
     const iniciales = [
-      { remito: 'REM-8492', precinto: 'PRC-102938', ownerId: 'VET-1001', mascota: 'Nefer', analisis: 'Hemograma Completo', estado: 'En Tránsito', estadoPrecinto: 'Intacto', clinicaOrigen: 'Clínica Norte', fecha: '24/10/2026', resultado: 'Valores globulares normales.' },
+      { remito: 'REM-8492', precinto: 'PRC-102938', ownerId: 'VET-1001', mascota: 'Nefer', analisis: 'Hemograma Completo', estado: 'En Tránsito', estadoPrecinto: 'Intacto', clinicaOrigen: 'Clínica Norte', fecha: '24/10/2026', resultado: 'Valores globulares dentro de rangos normales.' },
       { remito: 'REM-3310', precinto: 'PRC-992812', ownerId: 'VET-1001', mascota: 'Currito', analisis: 'Perfil Renal', estado: 'Empaquetada', estadoPrecinto: 'Intacto', clinicaOrigen: 'Clínica Centro', fecha: '24/10/2026', resultado: 'Pendiente' },
-      { remito: 'REM-5521', precinto: 'PRC-441029', ownerId: 'VET-2002', mascota: 'Firulais', analisis: 'Urocultivo', estado: 'Analizada', estadoPrecinto: 'Intacto', clinicaOrigen: 'Clínica Norte', fecha: '23/10/2026', resultado: 'Negativo para infección bacteriana.' },
+      { remito: 'REM-5521', precinto: 'PRC-441029', ownerId: 'VET-2002', mascota: 'Firulais', analisis: 'Urocultivo', estado: 'Analizada', estadoPrecinto: 'Intacto', clinicaOrigen: 'Clínica Norte', fecha: '23/10/2026', resultado: 'Negativo para bacterias.' },
     ];
     
     const guardadas = JSON.parse(localStorage.getItem('muestras_db') || '[]');
-    setMuestras(guardadas.length > 0 ? guardadas : iniciales);
+    if (guardadas.length === 0) {
+      localStorage.setItem('muestras_db', JSON.stringify(iniciales));
+      setMuestras(iniciales);
+    } else {
+      setMuestras(guardadas);
+    }
   }, [role, navigate]);
 
-  // Filtrado de muestras según el modo elegido
   const muestrasFiltradas = muestras.filter(m => {
     if (searchMode === 'codigo') {
       if (!searchTerm.trim()) return false;
@@ -37,7 +42,7 @@ const LaboratorioPage = () => {
         m.mascota?.toLowerCase().includes(term)
       );
     }
-    return true; // Modo listado muestra todo
+    return true;
   });
 
   const actualizarEstadoMuestra = (remitoTarget, nuevoEstado, nuevoEstadoPrecinto = null) => {
@@ -60,14 +65,13 @@ const LaboratorioPage = () => {
   };
 
   const handleDescargarPDF = (muestra) => {
-    // Simulación de descarga e impresión de informe médico
     const ventanaImpresion = window.open('', '_blank');
     ventanaImpresion.document.write(`
       <html>
         <head>
           <title>Informe de Laboratorio - ${muestra.remito}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            body { font-family: Arial, sans-serif; padding: 25px; color: #333; }
             .header { border-bottom: 2px solid #129b9b; padding-bottom: 10px; margin-bottom: 20px; }
             .title { color: #129b9b; margin: 0; }
             .box { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
@@ -85,15 +89,15 @@ const LaboratorioPage = () => {
             <p><strong>Código Dueño:</strong> ${muestra.ownerId}</p>
             <p><strong>Paciente:</strong> ${muestra.mascota}</p>
             <p><strong>Clínica Origen:</strong> ${muestra.clinicaOrigen}</p>
-            <p><strong>Fecha de Emisión:</strong> ${muestra.fecha}</p>
+            <p><strong>Fecha:</strong> ${muestra.fecha}</p>
           </div>
           <div class="box">
             <h3>Resultado del Análisis (${muestra.analisis}):</h3>
             <p><strong>Estado:</strong> ${muestra.estado}</p>
-            <p><strong>Informe Diagnóstico:</strong> ${muestra.resultado || 'En proceso de análisis.'}</p>
+            <p><strong>Informe Diagnóstico:</strong> ${muestra.resultado || 'Muestra procesada correctamente.'}</p>
           </div>
           <div class="footer">
-            <p>Este documento cuenta con trazabilidad inmutable registrada en el sistema central Vet2Gö.</p>
+            <p>Documento oficial emitido con cadena de custodia inmutable.</p>
           </div>
         </body>
       </html>
@@ -106,20 +110,18 @@ const LaboratorioPage = () => {
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6">
       <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white flex flex-col justify-between overflow-y-auto">
         <div>
-          {/* Header */}
           <div className="flex justify-between items-center mb-4">
-            <button onClick={() => navigate('/home')} className="text-sm font-semibold hover:underline">‹ Back</button>
+            <button onClick={() => navigate('/laboratorio-hub')} className="text-sm font-semibold hover:underline">‹ Volver</button>
             <h2 className="font-bold text-lg">Muestras Biológicas</h2>
             <div className="w-6"></div>
           </div>
 
-          {/* Opciones de Búsqueda */}
-          <div className="bg-white/10 p-1.5 rounded-2xl flex mb-4 text-xs font-bold">
+          <div className="bg-white/10 p-1 rounded-2xl flex mb-4 text-xs font-bold">
             <button 
               onClick={() => setSearchMode('listado')}
               className={`flex-1 py-2 rounded-xl transition-all ${searchMode === 'listado' ? 'bg-white text-[#129b9b] shadow' : 'text-white'}`}
             >
-              📋 Ver Todo
+              📋 Ver Lista
             </button>
             <button 
               onClick={() => setSearchMode('codigo')}
@@ -129,7 +131,6 @@ const LaboratorioPage = () => {
             </button>
           </div>
 
-          {/* Input si está activo el modo Búsqueda por Código */}
           {searchMode === 'codigo' && (
             <div className="mb-4">
               <input 
@@ -142,7 +143,6 @@ const LaboratorioPage = () => {
             </div>
           )}
 
-          {/* Listado de Tarjetas de Muestras */}
           <div className="space-y-3">
             {muestrasFiltradas.length > 0 ? (
               muestrasFiltradas.map((m) => (
@@ -167,10 +167,9 @@ const LaboratorioPage = () => {
                     <p className="col-span-2 font-mono text-gray-500"><strong>Precinto:</strong> {m.precinto}</p>
                   </div>
 
-                  {/* Acciones de Recepción Sanitaria */}
                   {m.estado !== 'Muestra Rechazada' && m.estado !== 'Analizada' && (
                     <div className="bg-cyan-50 p-2.5 rounded-xl border border-cyan-100 space-y-2 pt-2">
-                      <p className="font-bold text-[#129b9b] text-[10px] uppercase">Control Sanitarió:</p>
+                      <p className="font-bold text-[#129b9b] text-[10px] uppercase">Control Sanitario:</p>
                       <div className="flex gap-2">
                         <button 
                           onClick={() => actualizarEstadoMuestra(m.remito, 'Recibida', 'Intacto')}
@@ -197,7 +196,6 @@ const LaboratorioPage = () => {
                     </div>
                   )}
 
-                  {/* Botón Descargar Informe en PDF */}
                   <button 
                     onClick={() => handleDescargarPDF(m)}
                     className="w-full bg-gray-100 hover:bg-gray-200 text-[#129b9b] font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-gray-200 transition-colors mt-2"

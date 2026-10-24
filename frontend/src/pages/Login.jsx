@@ -17,6 +17,25 @@ const Login = () => {
 
   const [codigoGenerado, setCodigoGenerado] = useState(null);
 
+  // Función para guardar sesión con expiración de 10 minutos
+  const guardarSesionConExpiracion = (role, clientName, clientId = null) => {
+    const ahora = Date.now();
+    const tiempoExpiracion = ahora + 10 * 60 * 1000; // 10 minutos en ms
+
+    localStorage.setItem('token', 'demo_token');
+    localStorage.setItem('token_expiration', tiempoExpiracion.toString());
+    localStorage.setItem('role', role);
+    localStorage.setItem('clientName', clientName);
+    
+    if (clientId) {
+      localStorage.setItem('clientId', clientId);
+    } else {
+      localStorage.removeItem('clientId');
+    }
+
+    navigate('/home');
+  };
+
   const handleLoginCliente = (e) => {
     e.preventDefault();
     if (!loginNombre.trim() || !loginApellido.trim() || !loginCodigo.trim()) {
@@ -24,12 +43,11 @@ const Login = () => {
       return;
     }
 
-    localStorage.setItem('token', 'demo_token');
-    localStorage.setItem('role', 'cliente');
-    localStorage.setItem('clientName', `${loginNombre.trim()} ${loginApellido.trim()}`);
-    localStorage.setItem('clientId', loginCodigo.trim().toUpperCase());
-
-    navigate('/home');
+    guardarSesionConExpiracion(
+      'cliente', 
+      `${loginNombre.trim()} ${loginApellido.trim()}`, 
+      loginCodigo.trim().toUpperCase()
+    );
   };
 
   const handleRegisterCliente = (e) => {
@@ -41,21 +59,15 @@ const Login = () => {
   };
 
   const handleEntrarConCodigoNuevo = () => {
-    localStorage.setItem('token', 'demo_token');
-    localStorage.setItem('role', 'cliente');
-    localStorage.setItem('clientName', `${regNombre.trim()} ${regApellido.trim()}`);
-    localStorage.setItem('clientId', codigoGenerado);
-
-    navigate('/home');
+    guardarSesionConExpiracion(
+      'cliente', 
+      `${regNombre.trim()} ${regApellido.trim()}`, 
+      codigoGenerado
+    );
   };
 
-  const handleStartRole = (role, name) => {
-    localStorage.setItem('token', 'demo_token');
-    localStorage.setItem('role', role);
-    localStorage.setItem('clientName', name);
-    localStorage.removeItem('clientId');
-
-    navigate('/home');
+  const handleStartVeterinario = () => {
+    guardarSesionConExpiracion('veterinario', 'Dra. María Silva (Clínica Norte)');
   };
 
   return (
@@ -63,7 +75,7 @@ const Login = () => {
       <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl flex flex-col justify-between p-6 text-white relative overflow-hidden">
         
         {/* Logo */}
-        <div className="mt-2 text-center">
+        <div className="mt-4 md:mt-2 text-center">
           <h1 className="text-4xl font-extrabold tracking-wide flex items-center justify-center gap-1">
             Vet<span className="text-[#e8a2a7] text-3xl">2</span>Gö<span className="text-pink-300">🐾</span>
           </h1>
@@ -71,43 +83,36 @@ const Login = () => {
 
         {/* Imagen central */}
         <div className="my-auto w-full flex flex-col items-center">
-          <div className="w-48 h-48 rounded-full overflow-hidden border-4 border-white/20 shadow-xl mb-4">
+          <div className="w-56 h-56 md:w-60 md:h-60 rounded-full overflow-hidden border-4 border-white/20 shadow-xl mb-6">
             <img 
               src="https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&q=80&w=600" 
               alt="Veterinaria" 
               className="w-full h-full object-cover"
             />
           </div>
-          <p className="text-center text-xs px-6 text-cyan-50 font-medium">
-            Red Integrada de Clínicas y Laboratorio Biológico Central
+          <p className="text-center text-sm px-6 text-cyan-50 font-medium">
+            Cuenta con un profesional veterinario cuándo y dónde quieras
           </p>
         </div>
 
-        {/* Botones de Opciones Principales */}
-        <div className="w-full space-y-2 mb-2">
+        {/* Únicamente 2 Botones Principales en el Inicio */}
+        <div className="w-full space-y-3 mb-4">
           <button 
             onClick={() => setShowClienteModal(true)} 
-            className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3 rounded-full shadow-lg tracking-wider text-xs transition-transform active:scale-95"
+            className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
           >
             INGRESAR COMO CLIENTE
           </button>
           
           <button 
-            onClick={() => handleStartRole('veterinario', 'Dra. María Silva (Clínica Norte)')} 
-            className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-2.5 rounded-full shadow-md text-xs transition-transform active:scale-95"
+            onClick={handleStartVeterinario} 
+            className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
           >
-            VETERINARIO / CLÍNICA 🩺
-          </button>
-
-          <button 
-            onClick={() => handleStartRole('laboratorio', 'Laboratorio Central (Trazabilidad)')} 
-            className="w-full bg-cyan-900 hover:bg-cyan-950 text-cyan-100 font-bold py-2.5 rounded-full shadow-md text-xs transition-transform active:scale-95 border border-cyan-700"
-          >
-            LABORATORIO CENTRAL & REPORTES 🧪
+            INGRESAR COMO VETERINARIO
           </button>
         </div>
 
-        {/* Modal para Cliente */}
+        {/* Modal de Acceso para Clientes */}
         {showClienteModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white text-gray-800 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative space-y-4">
