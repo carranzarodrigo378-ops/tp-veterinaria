@@ -1,73 +1,135 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api/axiosConfig';
 
 const Login = () => {
   const navigate = useNavigate();
-  
-  const [showClienteModal, setShowClienteModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('login');
 
-  const [loginNombre, setLoginNombre] = useState('');
-  const [loginApellido, setLoginApellido] = useState('');
-  const [loginCodigo, setLoginCodigo] = useState('');
+  // Control de modales: null | 'cliente' | 'veterinario'
+  const [modalTipo, setModalTipo] = useState(null);
+  const [activeTabCliente, setActiveTabCliente] = useState('login');
 
+  // Estados formulario Login Cliente
+  const [loginUsuario, setLoginUsuario] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Estados formulario Login Veterinario
+  const [vetUsuario, setVetUsuario] = useState('');
+  const [vetPassword, setVetPassword] = useState('');
+
+  // Estados formulario Registro Cliente
+  const [regUsuario, setRegUsuario] = useState('');
+  const [regPassword, setRegPassword] = useState('');
   const [regNombre, setRegNombre] = useState('');
   const [regApellido, setRegApellido] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regTelefono, setRegTelefono] = useState('');
 
-  const [codigoGenerado, setCodigoGenerado] = useState(null);
+  // Estados de control
+  const [cargando, setCargando] = useState(false);
+  const [errorMensaje, setErrorMensaje] = useState(null);
 
-  // Función para guardar sesión con expiración de 10 minutos
-  const guardarSesionConExpiracion = (role, clientName, clientId = null) => {
+  const guardarSesion = (token, role, userName) => {
     const ahora = Date.now();
-    const tiempoExpiracion = ahora + 10 * 60 * 1000; // 10 minutos en ms
+    const tiempoExpiracion = ahora + 10 * 60 * 1000; // 10 minutos
 
-    localStorage.setItem('token', 'demo_token');
+    localStorage.setItem('token', token);
     localStorage.setItem('token_expiration', tiempoExpiracion.toString());
     localStorage.setItem('role', role);
-    localStorage.setItem('clientName', clientName);
-    
-    if (clientId) {
-      localStorage.setItem('clientId', clientId);
-    } else {
-      localStorage.removeItem('clientId');
-    }
+    localStorage.setItem('clientName', userName);
 
     navigate('/home');
   };
 
-  const handleLoginCliente = (e) => {
+  // 1. Login para Clientes
+  const handleLoginCliente = async (e) => {
     e.preventDefault();
-    if (!loginNombre.trim() || !loginApellido.trim() || !loginCodigo.trim()) {
-      alert('Por favor completá Nombre, Apellido y tu Código.');
-      return;
+    setErrorMensaje(null);
+    setCargando(true);
+
+    try {
+      const res = await api.post('/api/auth/login-json', {
+        usuario: loginUsuario.trim(),
+        password: loginPassword,
+      });
+
+      const { access_token, rol, usuario } = res.data;
+      guardarSesion(access_token, rol, usuario);
+    } catch (err) {
+      console.error(err);
+      setErrorMensaje(err.response?.data?.detail || 'Usuario o contraseña incorrectos');
+    } finally {
+      setCargando(false);
     }
-
-    guardarSesionConExpiracion(
-      'cliente', 
-      `${loginNombre.trim()} ${loginApellido.trim()}`, 
-      loginCodigo.trim().toUpperCase()
-    );
   };
 
-  const handleRegisterCliente = (e) => {
+  // 2. Login para Veterinarios
+  const handleLoginVeterinario = async (e) => {
     e.preventDefault();
-    if (!regNombre.trim() || !regApellido.trim() || !regEmail.trim()) return;
+    setErrorMensaje(null);
+    setCargando(true);
 
-    const nuevoCodigo = `VET-${Math.floor(1000 + Math.random() * 9000)}`;
-    setCodigoGenerado(nuevoCodigo);
+    try {
+      const res = await api.post('/api/auth/login-json', {
+        usuario: vetUsuario.trim(),
+        password: vetPassword,
+      });
+
+      const { access_token, rol, usuario } = res.data;
+      guardarSesion(access_token, rol, usuario);
+    } catch (err) {
+      console.error(err);
+      setErrorMensaje(err.response?.data?.detail || 'Credenciales de veterinario inválidas');
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const handleEntrarConCodigoNuevo = () => {
-    guardarSesionConExpiracion(
-      'cliente', 
-      `${regNombre.trim()} ${regApellido.trim()}`, 
-      codigoGenerado
-    );
+  // 3. Registro de nuevos Clientes
+  const handleRegisterCliente = async (e) => {
+    e.preventDefault();
+    setErrorMensaje(null);
+    setCargando(true);
+
+    try {
+      await api.post('/api/auth/registro-cliente', {
+        usuario: regUsuario.trim(),
+        password: regPassword,
+        nombre: regNombre.trim(),
+        apellido: regApellido.trim(),
+        email: regEmail.trim(),
+        telefono: regTelefono.trim(),
+      });
+
+      // Login automático tras registrarse
+      const resLogin = await api.post('/api/auth/login-json', {
+        usuario: regUsuario.trim(),
+        password: regPassword,
+      });
+
+      guardarSesion(resLogin.data.access_token, resLogin.data.rol, resLogin.data.usuario);
+    } catch (err) {
+      console.error(err);
+      setErrorMensaje(err.response?.data?.detail || 'Error al registrar el cliente');
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const handleStartVeterinario = () => {
-    guardarSesionConExpiracion('veterinario', 'Dra. María Silva (Clínica Norte)');
+  const cerrarModal = () => {
+    setModalTipo(null);
+    setErrorMensaje(null);
+    setActiveTabCliente('login');
+    setLoginUsuario('');
+    setLoginPassword('');
+    setVetUsuario('');
+    setVetPassword('');
+    setRegUsuario('');
+    setRegPassword('');
+    setRegNombre('');
+    setRegApellido('');
+    setRegEmail('');
+    setRegTelefono('');
   };
 
   return (
@@ -95,138 +157,213 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Únicamente 2 Botones Principales en el Inicio */}
+        {/* Botones Principales */}
         <div className="w-full space-y-3 mb-4">
           <button 
-            onClick={() => setShowClienteModal(true)} 
+            onClick={() => {
+              setErrorMensaje(null);
+              setActiveTabCliente('login');
+              setModalTipo('cliente');
+            }} 
             className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
           >
             INGRESAR COMO CLIENTE
           </button>
           
           <button 
-            onClick={handleStartVeterinario} 
+            onClick={() => {
+              setErrorMensaje(null);
+              setModalTipo('veterinario');
+            }} 
             className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
           >
             INGRESAR COMO VETERINARIO
           </button>
         </div>
 
-        {/* Modal de Acceso para Clientes */}
-        {showClienteModal && (
+        {/* Modal de Acceso */}
+        {modalTipo && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white text-gray-800 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative space-y-4">
               <button 
-                onClick={() => { setShowClienteModal(false); setCodigoGenerado(null); }}
+                onClick={cerrarModal}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg"
               >
                 ✕
               </button>
 
-              <h3 className="font-bold text-[#129b9b] text-center text-base">Acceso Cliente</h3>
+              <h3 className="font-bold text-[#129b9b] text-center text-base">
+                {modalTipo === 'veterinario' 
+                  ? 'Acceso Veterinario' 
+                  : (activeTabCliente === 'login' ? 'Acceso Cliente' : 'Crear Cuenta Cliente')}
+              </h3>
 
-              {codigoGenerado ? (
-                <div className="text-center space-y-3 bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
-                  <span className="text-3xl">🎉</span>
-                  <p className="text-xs text-gray-700 font-medium">¡Registro exitoso! Tu código de cliente es:</p>
-                  <p className="text-xl font-mono font-extrabold text-[#129b9b] bg-white py-2 rounded-xl shadow-inner border border-cyan-200">
-                    {codigoGenerado}
-                  </p>
-                  <button 
-                    onClick={handleEntrarConCodigoNuevo}
-                    className="w-full bg-[#129b9b] text-white font-bold py-2.5 rounded-full text-xs shadow hover:bg-[#0d7878]"
-                  >
-                    CONTINUAR A MI CUENTA
-                  </button>
+              {/* Mensajes de error */}
+              {errorMensaje && (
+                <div className="bg-red-50 text-red-600 p-2 rounded-xl text-xs text-center border border-red-200">
+                  {errorMensaje}
                 </div>
-              ) : (
-                <>
-                  <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-bold">
-                    <button 
-                      onClick={() => setActiveTab('login')}
-                      className={`flex-1 py-1.5 rounded-lg transition-all ${activeTab === 'login' ? 'bg-white text-[#129b9b] shadow' : 'text-gray-500'}`}
-                    >
-                      Ingresar
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('register')}
-                      className={`flex-1 py-1.5 rounded-lg transition-all ${activeTab === 'register' ? 'bg-white text-[#129b9b] shadow' : 'text-gray-500'}`}
-                    >
-                      Primera vez
-                    </button>
-                  </div>
+              )}
 
-                  {activeTab === 'login' && (
+              {/* FLUJO VETERINARIO */}
+              {modalTipo === 'veterinario' && (
+                <form onSubmit={handleLoginVeterinario} className="space-y-3 text-xs">
+                  <div className="space-y-2">
+                    <input 
+                      type="text" 
+                      placeholder="Usuario veterinario (ej: vet_franco) *"
+                      required
+                      value={vetUsuario}
+                      onChange={(e) => setVetUsuario(e.target.value)}
+                      className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                    />
+                    <input 
+                      type="password" 
+                      placeholder="Contraseña *"
+                      required
+                      value={vetPassword}
+                      onChange={(e) => setVetPassword(e.target.value)}
+                      className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={cargando}
+                    className="w-full bg-[#129b9b] hover:bg-[#0e7c7c] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2"
+                  >
+                    {cargando ? 'VALIDANDO...' : 'INGRESAR AL SISTEMA'}
+                  </button>
+                </form>
+              )}
+
+              {/* FLUJO CLIENTE */}
+              {modalTipo === 'cliente' && (
+                <>
+                  {/* Vista de Login de Cliente */}
+                  {activeTabCliente === 'login' && (
                     <form onSubmit={handleLoginCliente} className="space-y-2.5 text-xs">
                       <div className="space-y-2">
                         <input 
                           type="text" 
-                          placeholder="Nombre *"
+                          placeholder="Usuario *"
                           required
-                          value={loginNombre}
-                          onChange={(e) => setLoginNombre(e.target.value)}
+                          value={loginUsuario}
+                          onChange={(e) => setLoginUsuario(e.target.value)}
                           className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                         <input 
-                          type="text" 
-                          placeholder="Apellido *"
+                          type="password" 
+                          placeholder="Contraseña *"
                           required
-                          value={loginApellido}
-                          onChange={(e) => setLoginApellido(e.target.value)}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
                           className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
-                        />
-                        <input 
-                          type="text" 
-                          placeholder="Código de cliente (ej: VET-1001) *"
-                          required
-                          value={loginCodigo}
-                          onChange={(e) => setLoginCodigo(e.target.value)}
-                          className="w-full border border-gray-200 p-2.5 rounded-xl font-mono uppercase focus:outline-none focus:border-[#129b9b]"
                         />
                       </div>
+
                       <button 
                         type="submit" 
+                        disabled={cargando}
                         className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2"
                       >
-                        INGRESAR
+                        {cargando ? 'INGRESANDO...' : 'INGRESAR'}
                       </button>
+
+                      {/* Enlace para cambiar a registro */}
+                      <p className="text-center text-[11px] text-gray-500 pt-2">
+                        ¿No tenés una cuenta?{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTabCliente('register');
+                            setErrorMensaje(null);
+                          }}
+                          className="text-[#129b9b] font-bold hover:underline cursor-pointer"
+                        >
+                          Crear cuenta
+                        </button>
+                      </p>
                     </form>
                   )}
 
-                  {activeTab === 'register' && (
-                    <form onSubmit={handleRegisterCliente} className="space-y-2.5 text-xs">
-                      <div className="space-y-2">
+                  {/* Vista de Registro de Cliente */}
+                  {activeTabCliente === 'register' && (
+                    <form onSubmit={handleRegisterCliente} className="space-y-2 text-xs">
+                      <div className="space-y-1.5">
                         <input 
                           type="text" 
-                          placeholder="Nombre *"
+                          placeholder="Usuario *"
                           required
-                          value={regNombre}
-                          onChange={(e) => setRegNombre(e.target.value)}
-                          className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                          value={regUsuario}
+                          onChange={(e) => setRegUsuario(e.target.value)}
+                          className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                         <input 
-                          type="text" 
-                          placeholder="Apellido *"
+                          type="password" 
+                          placeholder="Contraseña (mín 4 car.) *"
                           required
-                          value={regApellido}
-                          onChange={(e) => setRegApellido(e.target.value)}
-                          className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                          minLength={4}
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
+                        <div className="flex gap-1.5">
+                          <input 
+                            type="text" 
+                            placeholder="Nombre *"
+                            required
+                            value={regNombre}
+                            onChange={(e) => setRegNombre(e.target.value)}
+                            className="w-1/2 border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                          />
+                          <input 
+                            type="text" 
+                            placeholder="Apellido *"
+                            required
+                            value={regApellido}
+                            onChange={(e) => setRegApellido(e.target.value)}
+                            className="w-1/2 border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                          />
+                        </div>
                         <input 
                           type="email" 
                           placeholder="Email *"
                           required
                           value={regEmail}
                           onChange={(e) => setRegEmail(e.target.value)}
-                          className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                          className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
+                        />
+                        <input 
+                          type="tel" 
+                          placeholder="Teléfono (opcional)"
+                          value={regTelefono}
+                          onChange={(e) => setRegTelefono(e.target.value)}
+                          className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                       </div>
+
                       <button 
                         type="submit" 
-                        className="w-full bg-[#129b9b] hover:bg-[#0d7878] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2"
+                        disabled={cargando}
+                        className="w-full bg-[#129b9b] hover:bg-[#0d7878] text-white font-bold py-2.5 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-1"
                       >
-                        REGISTRARME Y OBTENER CÓDIGO
+                        {cargando ? 'REGISTRANDO...' : 'REGISTRARME'}
                       </button>
+
+                      {/* Enlace para regresar a login */}
+                      <p className="text-center text-[11px] text-gray-500 pt-2">
+                        ¿Ya tenés cuenta?{' '}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTabCliente('login');
+                            setErrorMensaje(null);
+                          }}
+                          className="text-[#129b9b] font-bold hover:underline cursor-pointer"
+                        >
+                          Iniciar sesión
+                        </button>
+                      </p>
                     </form>
                   )}
                 </>
