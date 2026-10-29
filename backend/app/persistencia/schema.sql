@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS clientes (
     dni        TEXT NOT NULL UNIQUE,
     telefono   TEXT NOT NULL,
     email      TEXT,
-    direccion  TEXT
+    direccion  TEXT,
+    activo     BOOLEAN NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS mascotas (
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS mascotas (
     sexo             TEXT NOT NULL CHECK (sexo IN ('macho', 'hembra')),
     fecha_nacimiento TEXT,
     id_cliente       INTEGER NOT NULL,  -- responsable obligatorio
+    activo           BOOLEAN NOT NULL DEFAULT 1,
     FOREIGN KEY (id_cliente) REFERENCES clientes (id_cliente)
 );
 
