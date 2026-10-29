@@ -2,6 +2,16 @@
 -- Se ejecuta al iniciar la app; IF NOT EXISTS lo hace seguro de correr siempre.
 -- Fechas: TEXT/DATETIME en formato ISO (YYYY-MM-DD o YYYY-MM-DD HH:MM:SS)
 
+-- ==================== USUARIOS ====================
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    rol TEXT NOT NULL CHECK (rol IN ('admin', 'veterinario', 'cliente')),
+    activo BOOLEAN NOT NULL DEFAULT 1
+);
+
 -- ==================== CLÍNICA ====================
 
 CREATE TABLE IF NOT EXISTS clientes (
