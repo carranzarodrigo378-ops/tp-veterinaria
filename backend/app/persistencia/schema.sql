@@ -271,3 +271,21 @@ CREATE INDEX IF NOT EXISTS idx_consultas_historia ON consultas (historia_clinica
 CREATE INDEX IF NOT EXISTS idx_turnos_veterinario ON turnos (veterinario_id, fecha_hora_inicio);
 CREATE INDEX IF NOT EXISTS idx_muestras_remito ON muestras (remito_id);
 CREATE INDEX IF NOT EXISTS idx_historial_muestra ON historial_estado_muestras (muestra_id);
+
+-- ==================== SEGURIDAD Y USUARIOS ====================
+
+CREATE TABLE IF NOT EXISTS usuarios (
+    id_usuario     INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario        TEXT NOT NULL UNIQUE,
+    password_hash  TEXT NOT NULL,
+    rol            TEXT NOT NULL CHECK (rol IN ('admin', 'veterinario', 'bioquimico', 'cliente')),
+    nombre         TEXT NOT NULL,
+    apellido       TEXT NOT NULL,
+    email          TEXT,
+    telefono       TEXT,
+    matricula      TEXT,
+    id_cliente     INTEGER,
+    id_veterinario INTEGER,
+    FOREIGN KEY (id_cliente) REFERENCES clientes (id_cliente),
+    FOREIGN KEY (id_veterinario) REFERENCES veterinarios (id_veterinario)
+);

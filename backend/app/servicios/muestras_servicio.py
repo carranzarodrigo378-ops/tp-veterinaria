@@ -1,90 +1,99 @@
+from datetime import datetime
 from app.dominio.modelos import MuestraBiologica
 from app.dominio.estados import ExcepcionTransicionEstado
 from app.esquemas.enums import TipoMuestra
+from app.persistencia.muestra_dao import MuestraDAO
+from app.persistencia.historialMuestra_dao import HistorialMuestraDAO
+from app.persistencia.conexion import DatabaseSingleton
 
 
 class ServicioMuestras:
-    def __init__(self, repositorio=None):
-        self.repositorio = repositorio
-        self._almacen_muestras: dict[int, MuestraBiologica] = {}
-        self._contador_id = 1
+    def __init__(self, muestra_dao: MuestraDAO = None, historial_dao: HistorialMuestraDAO = None):
+        self.muestra_dao = muestra_dao or MuestraDAO()
+        self.historial_dao = historial_dao or HistorialMuestraDAO()
+        self.db = DatabaseSingleton()
 
-    def _mapear_a_respuesta(self, muestra: MuestraBiologica) -> dict:
+    def _mapear_a_respuesta(self, muestra: dict) -> dict:
+        cursor = self.db.get_conexion().execute(
+            "SELECT estado, fecha_hora, usuario, observaciones FROM historial_estado_muestras WHERE muestra_id = ? ORDER BY id_historial_estado_muestra ASC",
+            (muestra["id_muestra"],)
+        )
+        trazabilidad = [
+            f"[{f['fecha_hora']}] Estado: {f['estado']} | Usuario: {f.get('usuario') or 'Sistema'}"
+            for f in cursor.fetchall()
+        ]
+
         return {
-            "id_muestra": muestra.id_muestra,
-            "codigo_etiqueta": muestra.codigo_etiqueta,
-            "id_orden_derivacion": muestra.id_orden_derivacion,
-            "tipo_muestra": muestra.tipo_muestra,
-            "estado_actual": muestra.estado.nombre,
-            "id_conservadora": muestra.id_conservadora,
-            "nro_precinto": muestra.nro_precinto,
-            "transporte_info": muestra.transporte_info,
-            "id_resultado": muestra.id_resultado,
-            "historial_trazabilidad": muestra.obtener_trazabilidad_completa(),
+            "id_muestra": muestra["id_muestra"],
+            "codigo_etiqueta": muestra["codigo"],
+            "id_orden_derivacion": muestra["orden_derivacion_id"],
+            "tipo_muestra": muestra.get("tipo", "sangre"),
+            "estado_actual": muestra["estado_actual"],
+            "id_conservadora": muestra.get("remito_id"),
+            "nro_precinto": None,
+            "transporte_info": None,
+            "id_resultado": None,
+            "historial_trazabilidad": trazabilidad,
         }
 
     def registrar_extraccion(self, datos_crear) -> dict:
-        # Acepta tanto dict como el esquema MuestraCrear de Pydantic
         datos = datos_crear if isinstance(datos_crear, dict) else datos_crear.model_dump()
-        
-        tipo_str = str(datos.get("tipo_muestra", "")).lower()
-        valores_permitidos = [e.value for e in TipoMuestra]
-        if tipo_str not in valores_permitidos:
-            raise ValueError(
-                f"Tipo de muestra inválido '{tipo_str}'. Opciones válidas: {valores_permitidos}"
-            )
+        tipo_str = str(datos.get("tipo_muestra", "sangre")).lower()
 
-        nueva_muestra = MuestraBiologica(
-            id_muestra=self._contador_id,
-            codigo_etiqueta=datos["codigo_etiqueta"],
-            id_orden_derivacion=datos["id_orden_derivacion"],
-            tipo_muestra=tipo_str
+        conn = self.db.get_conexion()
+        cursor = conn.execute(
+            """
+            INSERT INTO muestras (orden_derivacion_id, codigo, tipo, fecha_extraccion, estado_actual)
+            VALUES (?, ?, ?, datetime('now', 'localtime'), 'extraida')
+            """,
+            (datos["id_orden_derivacion"], datos["codigo_etiqueta"], tipo_str)
         )
-        self._almacen_muestras[self._contador_id] = nueva_muestra
-        self._contador_id += 1
-        return self._mapear_a_respuesta(nueva_muestra)
+        conn.commit()
+        id_muestra = cursor.lastrowid
+
+        # Insertar registro inicial en historial inmutable
+        conn.execute(
+            "INSERT INTO historial_estado_muestras (muestra_id, estado, fecha_hora, usuario) VALUES (?, 'extraida', datetime('now', 'localtime'), 'Sistema')",
+            (id_muestra,)
+        )
+        conn.commit()
+
+        return self.obtener_por_id(id_muestra)
 
     def empaquetar(self, id_muestra: int, datos_empaquetar) -> dict:
-        datos = datos_empaquetar if isinstance(datos_empaquetar, dict) else datos_empaquetar.model_dump()
-        muestra = self._obtener_entidad(id_muestra)
-        muestra.empaquetar(
-            id_conservadora=datos["id_conservadora"],
-            nro_precinto=datos["nro_precinto"]
-        )
-        return self._mapear_a_respuesta(muestra)
+        self.muestra_dao.cambiar_estado(id_muestra, nuevo_estado="empaquetada", usuario="Veterinario")
+        return self.obtener_por_id(id_muestra)
 
     def despachar(self, id_muestra: int, datos_despacho) -> dict:
-        datos = datos_despacho if isinstance(datos_despacho, dict) else datos_despacho.model_dump()
-        muestra = self._obtener_entidad(id_muestra)
-        muestra.despachar(transporte_info=datos["transporte_info"])
-        return self._mapear_a_respuesta(muestra)
+        self.muestra_dao.cambiar_estado(id_muestra, nuevo_estado="en_transito", usuario="Transportista")
+        return self.obtener_por_id(id_muestra)
 
     def recibir_en_laboratorio(self, id_muestra: int, datos_recepcion) -> dict:
         datos = datos_recepcion if isinstance(datos_recepcion, dict) else datos_recepcion.model_dump()
-        muestra = self._obtener_entidad(id_muestra)
-        muestra.recibir_en_laboratorio(
-            precinto_intacto=datos["precinto_intacto"],
-            observaciones=datos.get("observaciones", "")
+        estado_precinto = "intacto" if datos.get("precinto_intacto", True) else "roto"
+
+        # Si el precinto está roto, MuestraDAO pasa el estado automáticamente a rechazada
+        self.muestra_dao.cambiar_estado(
+            id_muestra,
+            nuevo_estado="recibida",
+            estado_precinto=estado_precinto,
+            usuario="Bioquímico"
         )
-        return self._mapear_a_respuesta(muestra)
+        return self.obtener_por_id(id_muestra)
 
     def registrar_analisis(self, id_muestra: int, datos_analisis) -> dict:
-        datos = datos_analisis if isinstance(datos_analisis, dict) else datos_analisis.model_dump()
-        muestra = self._obtener_entidad(id_muestra)
-        muestra.registrar_analisis(resultado_id=datos["resultado_id"])
-        return self._mapear_a_respuesta(muestra)
+        self.muestra_dao.cambiar_estado(id_muestra, nuevo_estado="analizada", usuario="Bioquímico")
+        return self.obtener_por_id(id_muestra)
 
     def obtener_por_id(self, id_muestra: int) -> dict:
-        muestra = self._obtener_entidad(id_muestra)
+        muestra = self.muestra_dao.obtener_por_id(id_muestra)
+        if not muestra:
+            raise KeyError(f"No existe la muestra con ID {id_muestra}")
         return self._mapear_a_respuesta(muestra)
 
     def listar_todas(self) -> list[dict]:
-        return [self._mapear_a_respuesta(m) for m in self._almacen_muestras.values()]
-
-    def _obtener_entidad(self, id_muestra: int) -> MuestraBiologica:
-        if id_muestra not in self._almacen_muestras:
-            raise KeyError(f"No existe la muestra con ID {id_muestra}")
-        return self._almacen_muestras[id_muestra]
+        muestras = self.muestra_dao.obtener_todos(limite=500)
+        return [self._mapear_a_respuesta(m) for m in muestras]
 
 
 servicio_muestras = ServicioMuestras()

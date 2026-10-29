@@ -1,40 +1,30 @@
 from datetime import datetime, timedelta
+from app.esquemas.turnos import TurnoCrear
+from app.persistencia.turnos_dao import TurnoDAO
 
 
 class TurnosServicio:
-    def __init__(self, repositorio_turnos=None):
-        self.repositorio = repositorio_turnos
-        self._turnos = []
-        self._contador_turnos = 1
+    def __init__(self, turno_dao: TurnoDAO = None):
+        self.turno_dao = turno_dao or TurnoDAO()
 
-    def agendar_turno(self, id_veterinario, id_mascota, fecha_hora, duracion_minutos=30):
+    def agendar_turno(self, id_veterinario: int, id_mascota: int, fecha_hora: datetime, duracion_minutos: int = 30):
         inicio_nuevo = fecha_hora
         fin_nuevo = inicio_nuevo + timedelta(minutes=duracion_minutos)
 
-        # Validación de superposición de turnos para el mismo veterinario
-        for turno in self._turnos:
-            if turno["id_veterinario"] == id_veterinario:
-                inicio_existente = turno["inicio"]
-                fin_existente = turno["fin"]
+        turno_dto = TurnoCrear(
+            fecha_hora_inicio=inicio_nuevo,
+            fecha_hora_fin=fin_nuevo,
+            veterinario_id=id_veterinario,
+            mascota_id=id_mascota,
+            estado="programado",
+        )
 
-                # Hay solapamiento si el nuevo turno inicia antes de que termine uno existente
-                # y termina después de que empiece
-                if inicio_nuevo < fin_existente and fin_nuevo > inicio_existente:
-                    raise ValueError(
-                        f"El profesional ya tiene un turno asignado entre "
-                        f"{inicio_existente.strftime('%H:%M')} y {fin_existente.strftime('%H:%M')}."
-                    )
+        # TurnoDAO ejecuta _hay_superposicion e inserta transaccionalmente
+        id_turno = self.turno_dao.crear(turno_dto)
+        return self.turno_dao.obtener_por_id(id_turno)
 
-        nuevo_turno = {
-            "id_turno": self._contador_turnos,
-            "id_veterinario": id_veterinario,
-            "id_mascota": id_mascota,
-            "inicio": inicio_nuevo,
-            "fin": fin_nuevo
-        }
-        self._turnos.append(nuevo_turno)
-        self._contador_turnos += 1
-        return nuevo_turno
+    def listar_turnos(self) -> list[dict]:
+        return self.turno_dao.obtener_todos(limite=500)
 
 
 servicio_turnos = TurnosServicio()

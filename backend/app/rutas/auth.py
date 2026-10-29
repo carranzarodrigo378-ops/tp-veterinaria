@@ -1,3 +1,4 @@
+import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
@@ -8,11 +9,12 @@ from app.core.seguridad import (
     verificar_password,
 )
 from app.rutas.dependencias import requerir_rol
+from app.persistencia.conexion import DatabaseSingleton
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 
-# --- Esquemas Pydantic para tipado y documentación automática en Swagger ---
+# --- Esquemas Pydantic ---
 
 class LoginJsonEsquema(BaseModel):
     usuario: str = Field(min_length=1, description="Nombre de usuario")
@@ -24,6 +26,7 @@ class RegistroClienteEsquema(BaseModel):
     password: str = Field(min_length=4, description="Contraseña de acceso")
     nombre: str = Field(min_length=1, description="Nombre de pila")
     apellido: str = Field(min_length=1, description="Apellido")
+    dni: str = Field(default="", description="DNI del cliente (opcional en formulario rápido)")
     email: EmailStr = Field(description="Correo electrónico válido")
     telefono: str = Field(default="", description="Teléfono de contacto")
 
@@ -35,21 +38,11 @@ class RegistroVeterinarioEsquema(BaseModel):
     matricula: str = Field(min_length=1, description="Matrícula profesional (ej: MP-4589)")
 
 
-# --- Almacenamiento en memoria inicial con contraseñas seguras (bcrypt) ---
-
-USUARIOS_DB = {
-    "admin": {
-        "password": hashear_password("admin123"),
-        "rol": "admin",
-        "nombre": "Administrador General",
-    },
-    "vet_franco": {
-        "password": hashear_password("vet123"),
-        "rol": "veterinario",
-        "nombre": "Dr. Franco",
-        "matricula": "MP-4589",
-    },
-}
+def _obtener_usuario_db(username: str) -> dict | None:
+    conn = DatabaseSingleton().get_conexion()
+    cursor = conn.execute("SELECT * FROM usuarios WHERE usuario = ?", (username,))
+    fila = cursor.fetchone()
+    return dict(fila) if fila else None
 
 
 # --- Endpoints de Autenticación ---
@@ -57,8 +50,8 @@ USUARIOS_DB = {
 @router.post("/login")
 def login(formulario: OAuth2PasswordRequestForm = Depends()):
     """Endpoint estándar OAuth2 para el candado verde de Swagger UI."""
-    usuario_info = USUARIOS_DB.get(formulario.username)
-    if not usuario_info or not verificar_password(formulario.password, usuario_info["password"]):
+    usuario_info = _obtener_usuario_db(formulario.username)
+    if not usuario_info or not verificar_password(formulario.password, usuario_info["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
@@ -77,8 +70,8 @@ def login(formulario: OAuth2PasswordRequestForm = Depends()):
 @router.post("/login-json")
 def login_json(credenciales: LoginJsonEsquema):
     """Endpoint en formato JSON para el formulario de login del frontend en React."""
-    usuario_info = USUARIOS_DB.get(credenciales.usuario)
-    if not usuario_info or not verificar_password(credenciales.password, usuario_info["password"]):
+    usuario_info = _obtener_usuario_db(credenciales.usuario)
+    if not usuario_info or not verificar_password(credenciales.password, usuario_info["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
@@ -93,26 +86,59 @@ def login_json(credenciales: LoginJsonEsquema):
     }
 
 
-# Autoregistro público: cualquiera puede registrarse como cliente
+# Autoregistro público: guarda tanto en 'clientes' como en 'usuarios'
 @router.post("/registro-cliente", status_code=status.HTTP_201_CREATED)
 def registrar_cliente(datos: RegistroClienteEsquema):
-    if datos.usuario in USUARIOS_DB:
+    if _obtener_usuario_db(datos.usuario):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El nombre de usuario ya está registrado.",
         )
 
-    USUARIOS_DB[datos.usuario] = {
-        "password": hashear_password(datos.password),
-        "rol": "cliente",
-        "email": datos.email,
-        "nombre": f"{datos.nombre} {datos.apellido}".strip(),
-        "telefono": datos.telefono,
-    }
+    conn = DatabaseSingleton().get_conexion()
+    cursor = conn.cursor()
+    try:
+        # Si el frontend no envía DNI, generamos uno único basado en el username para cumplir UNIQUE NOT NULL de clientes
+        dni_final = datos.dni.strip() if datos.dni.strip() else f"USR-{datos.usuario}"
+        telefono_final = datos.telefono.strip() if datos.telefono.strip() else "Sin especificar"
+
+        cursor.execute(
+            """
+            INSERT INTO clientes (nombre, apellido, dni, telefono, email)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (datos.nombre, datos.apellido, dni_final, telefono_final, datos.email),
+        )
+        id_cliente = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT INTO usuarios (usuario, password_hash, rol, nombre, apellido, email, telefono, id_cliente)
+            VALUES (?, ?, 'cliente', ?, ?, ?, ?, ?)
+            """,
+            (
+                datos.usuario,
+                hashear_password(datos.password),
+                datos.nombre,
+                datos.apellido,
+                datos.email,
+                telefono_final,
+                id_cliente,
+            ),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error de integridad al registrar cliente: {str(e)}",
+        )
+
     return {
-        "mensaje": "Cliente registrado exitosamente.",
+        "mensaje": "Cliente registrado exitosamente en la base de datos.",
         "usuario": datos.usuario,
         "rol": "cliente",
+        "id_cliente": id_cliente,
     }
 
 
@@ -123,20 +149,63 @@ def registrar_cliente(datos: RegistroClienteEsquema):
     dependencies=[Depends(requerir_rol(["admin"]))],
 )
 def registrar_veterinario(datos: RegistroVeterinarioEsquema):
-    if datos.usuario in USUARIOS_DB:
+    if _obtener_usuario_db(datos.usuario):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El nombre de usuario ya está en uso.",
         )
 
-    USUARIOS_DB[datos.usuario] = {
-        "password": hashear_password(datos.password),
-        "rol": "veterinario",
-        "nombre": datos.nombre_completo,
-        "matricula": datos.matricula,
-    }
+    partes = datos.nombre_completo.strip().split(" ", 1)
+    nombre = partes[0]
+    apellido = partes[1] if len(partes) > 1 else "Profesional"
+
+    conn = DatabaseSingleton().get_conexion()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO veterinarios (nombre, apellido, matricula, clinica_id)
+            VALUES (?, ?, ?, 1)
+            """,
+            (nombre, apellido, datos.matricula),
+        )
+        id_veterinario = cursor.lastrowid
+
+        cursor.execute(
+            """
+            INSERT INTO usuarios (usuario, password_hash, rol, nombre, apellido, matricula, id_veterinario)
+            VALUES (?, ?, 'veterinario', ?, ?, ?, ?)
+            """,
+            (
+                datos.usuario,
+                hashear_password(datos.password),
+                nombre,
+                apellido,
+                datos.matricula,
+                id_veterinario,
+            ),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError as e:
+        conn.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se pudo registrar el veterinario (verifique que la matrícula no esté duplicada): {str(e)}",
+        )
+
     return {
         "mensaje": "Veterinario dado de alta exitosamente por el administrador.",
         "usuario": datos.usuario,
         "rol": "veterinario",
+        "id_veterinario": id_veterinario,
     }
+
+
+# Endpoint para verificar qué usuarios están guardados en SQLite
+@router.get("/usuarios")
+def listar_usuarios_registrados():
+    conn = DatabaseSingleton().get_conexion()
+    cursor = conn.execute(
+        "SELECT id_usuario, usuario, rol, nombre, apellido, email, matricula, id_cliente, id_veterinario FROM usuarios"
+    )
+    return [dict(fila) for fila in cursor.fetchall()]

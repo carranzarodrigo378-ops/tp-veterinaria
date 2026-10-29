@@ -1,97 +1,73 @@
-from datetime import date
+from app.esquemas.clientes import ClienteCrear, ClienteActualizar
 from app.esquemas.mascotas import MascotaCrear, MascotaActualizar
 from app.esquemas.enums import Sexo
+from app.persistencia.cliente_dao import ClienteDAO
+from app.persistencia.mascota_dao import MascotaDAO
+from app.persistencia.excepciones import ResponsableInexistenteError, ClienteDuplicadoError, ClienteConMascotasError
 
 
 class ClinicaServicio:
-    def __init__(self, repositorio_clinica=None):
-        self.repositorio = repositorio_clinica
-        self._clientes: dict[int, dict] = {}
-        self._mascotas: dict[int, dict] = {}
-        self._contador_clientes = 1
-        self._contador_mascotas = 1
+    def __init__(self, cliente_dao: ClienteDAO = None, mascota_dao: MascotaDAO = None):
+        self.cliente_dao = cliente_dao or ClienteDAO()
+        self.mascota_dao = mascota_dao or MascotaDAO()
 
     # --- CLIENTES ---
     def registrar_cliente(self, datos_cliente: dict) -> dict:
-        cliente_id = self._contador_clientes
-        cliente = {
-            "id_cliente": cliente_id,
-            "nombre": datos_cliente.get("nombre", ""),
-            "apellido": datos_cliente.get("apellido", ""),
-            "dni": datos_cliente.get("dni", ""),
-            "telefono": datos_cliente.get("telefono", ""),
-            "email": datos_cliente.get("email", ""),
-        }
-        self._clientes[cliente_id] = cliente
-        self._contador_clientes += 1
-        return cliente
+        # Valida con el esquema Pydantic para asegurar tipos y campos requeridos
+        cliente_dto = ClienteCrear(**datos_cliente)
+        id_cliente = self.cliente_dao.crear(cliente_dto)
+        return self.obtener_cliente(id_cliente)
 
     def listar_clientes(self) -> list[dict]:
-        return list(self._clientes.values())
+        return self.cliente_dao.obtener_todos(limite=500)
 
     def obtener_cliente(self, id_cliente: int) -> dict:
-        if id_cliente not in self._clientes:
+        cliente = self.cliente_dao.obtener_por_id(id_cliente)
+        if not cliente:
             raise KeyError(f"No existe el cliente con ID {id_cliente}")
-        return self._clientes[id_cliente]
+        return cliente
 
     # --- MASCOTAS ---
     def registrar_mascota(self, datos_mascota: MascotaCrear) -> dict:
-        # Regla de negocio: Toda mascota tiene un cliente responsable (obligatorio)
-        if datos_mascota.id_cliente not in self._clientes:
+        # Regla de negocio y validación de existencia del responsable
+        if not self.cliente_dao.existe(datos_mascota.id_cliente):
             raise ValueError(f"El cliente con ID {datos_mascota.id_cliente} no existe en el sistema.")
 
-        mascota_id = self._contador_mascotas
-        nueva_mascota = {
-            "id_mascota": mascota_id,
-            "nombre": datos_mascota.nombre,
-            "especie": datos_mascota.especie,
-            "raza": datos_mascota.raza,
-            "sexo": datos_mascota.sexo.value if isinstance(datos_mascota.sexo, Sexo) else datos_mascota.sexo,
-            "fecha_nacimiento": datos_mascota.fecha_nacimiento,
-            "id_cliente": datos_mascota.id_cliente,
-            "historial_clinico": "Historia clínica iniciada."
-        }
-        self._mascotas[mascota_id] = nueva_mascota
-        self._contador_mascotas += 1
-        return nueva_mascota
+        id_mascota = self.mascota_dao.crear(datos_mascota)
+        return self.obtener_mascota(id_mascota)
 
     def actualizar_mascota(self, id_mascota: int, datos_actualizacion: MascotaActualizar) -> dict:
-        if id_mascota not in self._mascotas:
+        if not self.mascota_dao.existe(id_mascota):
             raise KeyError(f"No existe la mascota con ID {id_mascota}")
 
-        mascota = self._mascotas[id_mascota]
         datos_dict = datos_actualizacion.model_dump(exclude_unset=True)
-
         if "id_cliente" in datos_dict and datos_dict["id_cliente"] is not None:
-            if datos_dict["id_cliente"] not in self._clientes:
+            if not self.cliente_dao.existe(datos_dict["id_cliente"]):
                 raise ValueError(f"El cliente con ID {datos_dict['id_cliente']} no existe.")
 
-        if "sexo" in datos_dict and isinstance(datos_dict["sexo"], Sexo):
-            datos_dict["sexo"] = datos_dict["sexo"].value
-
-        for clave, valor in datos_dict.items():
-            mascota[clave] = valor
-
-        return mascota
+        self.mascota_dao.actualizar(id_mascota, datos_actualizacion)
+        return self.obtener_mascota(id_mascota)
 
     def cambiar_duenio_mascota(self, id_mascota: int, nuevo_id_cliente: int) -> dict:
-        if id_mascota not in self._mascotas:
+        if not self.mascota_dao.existe(id_mascota):
             raise KeyError(f"No existe la mascota con ID {id_mascota}")
-        if nuevo_id_cliente not in self._clientes:
+        if not self.cliente_dao.existe(nuevo_id_cliente):
             raise ValueError(f"El nuevo cliente con ID {nuevo_id_cliente} no existe en el sistema.")
 
-        self._mascotas[id_mascota]["id_cliente"] = nuevo_id_cliente
-        return self._mascotas[id_mascota]
+        actualizacion = MascotaActualizar(id_cliente=nuevo_id_cliente)
+        self.mascota_dao.actualizar(id_mascota, actualizacion)
+        return self.obtener_mascota(id_mascota)
 
     def listar_mascotas_por_cliente(self, id_cliente: int) -> list[dict]:
-        if id_cliente not in self._clientes:
+        if not self.cliente_dao.existe(id_cliente):
             raise KeyError(f"El cliente con ID {id_cliente} no existe.")
-        return [m for m in self._mascotas.values() if m["id_cliente"] == id_cliente]
+        return self.mascota_dao.obtener_por_cliente(id_cliente)
 
     def obtener_mascota(self, id_mascota: int) -> dict:
-        if id_mascota not in self._mascotas:
+        mascota = self.mascota_dao.obtener_por_id(id_mascota)
+        if not mascota:
             raise KeyError(f"No existe la mascota con ID {id_mascota}")
-        return self._mascotas[id_mascota]
+        return mascota
 
 
 servicio_clinica = ClinicaServicio()

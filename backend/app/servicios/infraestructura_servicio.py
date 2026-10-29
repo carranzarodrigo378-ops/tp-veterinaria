@@ -2,113 +2,74 @@ from app.esquemas.clinicas import ClinicaCrear, ClinicaActualizar
 from app.esquemas.laboratorio import LaboratorioCrear, LaboratorioActualizar
 from app.esquemas.contenedor import ContenedorCrear, ContenedorActualizar
 from app.esquemas.tipoanalisis import TipoAnalisisCrear, TipoAnalisisActualizar
-from app.esquemas.enums import EstadoContenedor, TipoMuestra
+from app.persistencia.clinica_dao import ClinicaDAO
+from app.persistencia.laboratorio_dao import LaboratorioDAO
+from app.persistencia.contenedor_dao import ContenedorDAO
+from app.persistencia.tipoAnalisis_dao import TipoAnalisisDAO
 
 
 class InfraestructuraServicio:
     def __init__(self):
-        self._clinicas: dict[int, dict] = {}
-        self._laboratorios: dict[int, dict] = {}
-        self._contenedores: dict[int, dict] = {}
-        self._tipos_analisis: dict[int, dict] = {}
-
-        self._contador_clinicas = 1
-        self._contador_laboratorios = 1
-        self._contador_contenedores = 1
-        self._contador_analisis = 1
+        self.clinica_dao = ClinicaDAO()
+        self.laboratorio_dao = LaboratorioDAO()
+        self.contenedor_dao = ContenedorDAO()
+        self.tipo_analisis_dao = TipoAnalisisDAO()
 
     # --- CLÍNICAS ---
     def crear_clinica(self, datos: ClinicaCrear) -> dict:
-        cid = self._contador_clinicas
-        registro = datos.model_dump()
-        registro["id_clinica"] = cid
-        self._clinicas[cid] = registro
-        self._contador_clinicas += 1
-        return registro
+        cid = self.clinica_dao.crear(datos)
+        return self.clinica_dao.obtener_por_id(cid)
 
     def listar_clinicas(self) -> list[dict]:
-        return list(self._clinicas.values())
+        return self.clinica_dao.obtener_todos(limite=500)
 
     def actualizar_clinica(self, id_clinica: int, datos: ClinicaActualizar) -> dict:
-        if id_clinica not in self._clinicas:
+        if not self.clinica_dao.existe(id_clinica):
             raise KeyError(f"No existe la clínica con ID {id_clinica}")
-        clinica = self._clinicas[id_clinica]
-        for clave, valor in datos.model_dump(exclude_unset=True).items():
-            clinica[clave] = valor
-        return clinica
+        self.clinica_dao.actualizar(id_clinica, datos)
+        return self.clinica_dao.obtener_por_id(id_clinica)
 
     # --- LABORATORIOS ---
     def crear_laboratorio(self, datos: LaboratorioCrear) -> dict:
-        lid = self._contador_laboratorios
-        registro = datos.model_dump()
-        registro["id_laboratorio"] = lid
-        self._laboratorios[lid] = registro
-        self._contador_laboratorios += 1
-        return registro
+        lid = self.laboratorio_dao.crear(datos)
+        return self.laboratorio_dao.obtener_por_id(lid)
 
     def listar_laboratorios(self) -> list[dict]:
-        return list(self._laboratorios.values())
+        return self.laboratorio_dao.obtener_todos(limite=500)
 
     def actualizar_laboratorio(self, id_laboratorio: int, datos: LaboratorioActualizar) -> dict:
-        if id_laboratorio not in self._laboratorios:
+        if not self.laboratorio_dao.existe(id_laboratorio):
             raise KeyError(f"No existe el laboratorio con ID {id_laboratorio}")
-        lab = self._laboratorios[id_laboratorio]
-        for clave, valor in datos.model_dump(exclude_unset=True).items():
-            lab[clave] = valor
-        return lab
+        self.laboratorio_dao.actualizar(id_laboratorio, datos)
+        return self.laboratorio_dao.obtener_por_id(id_laboratorio)
 
     # --- CONTENEDORES / CONSERVADORAS ---
     def crear_contenedor(self, datos: ContenedorCrear) -> dict:
-        cid = self._contador_contenedores
-        registro = datos.model_dump()
-        registro["id_contenedor"] = cid
-        if isinstance(registro.get("estado"), EstadoContenedor):
-            registro["estado"] = registro["estado"].value
-        self._contenedores[cid] = registro
-        self._contador_contenedores += 1
-        return registro
+        cid = self.contenedor_dao.crear(datos)
+        return self.contenedor_dao.obtener_por_id(cid)
 
     def listar_contenedores(self) -> list[dict]:
-        return list(self._contenedores.values())
+        return self.contenedor_dao.obtener_todos(limite=500)
 
     def actualizar_contenedor(self, id_contenedor: int, datos: ContenedorActualizar) -> dict:
-        if id_contenedor not in self._contenedores:
+        if not self.contenedor_dao.existe(id_contenedor):
             raise KeyError(f"No existe el contenedor con ID {id_contenedor}")
-        cont = self._contenedores[id_contenedor]
-        for clave, valor in datos.model_dump(exclude_unset=True).items():
-            if isinstance(valor, EstadoContenedor):
-                valor = valor.value
-            cont[clave] = valor
-        return cont
+        self.contenedor_dao.actualizar(id_contenedor, datos)
+        return self.contenedor_dao.obtener_por_id(id_contenedor)
 
-    # --- CATÁLOGO DE TIPOS DE ANÁLISIS ---
+    # --- TIPOS DE ANÁLISIS ---
     def crear_tipo_analisis(self, datos: TipoAnalisisCrear) -> dict:
-        # Validación de unicidad de nombre
-        for t in self._tipos_analisis.values():
-            if t["nombre"].lower() == datos.nombre.lower():
-                raise ValueError(f"Ya existe un tipo de análisis con el nombre '{datos.nombre}'")
-
-        aid = self._contador_analisis
-        registro = datos.model_dump()
-        registro["id_tipo_analisis"] = aid
-        if isinstance(registro.get("tipo_muestra"), TipoMuestra):
-            registro["tipo_muestra"] = registro["tipo_muestra"].value
-        self._tipos_analisis[aid] = registro
-        self._contador_analisis += 1
-        return registro
+        aid = self.tipo_analisis_dao.crear(datos)
+        return self.tipo_analisis_dao.obtener_por_id(aid)
 
     def listar_tipos_analisis(self) -> list[dict]:
-        return list(self._tipos_analisis.values())
+        return self.tipo_analisis_dao.obtener_todos(limite=500)
 
     def actualizar_tipo_analisis(self, id_tipo_analisis: int, datos: TipoAnalisisActualizar) -> dict:
-        if id_tipo_analisis not in self._tipos_analisis:
+        if not self.tipo_analisis_dao.existe(id_tipo_analisis):
             raise KeyError(f"No existe el tipo de análisis con ID {id_tipo_analisis}")
-        analisis = self._tipos_analisis[id_tipo_analisis]
-        for clave, valor in datos.model_dump(exclude_unset=True).items():
-            if isinstance(valor, TipoMuestra):
-                valor = valor.value
-            analisis[clave] = valor
-        return analisis
+        self.tipo_analisis_dao.actualizar(id_tipo_analisis, datos)
+        return self.tipo_analisis_dao.obtener_por_id(id_tipo_analisis)
 
 
 servicio_infraestructura = InfraestructuraServicio()
