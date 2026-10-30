@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
@@ -133,8 +134,18 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6">
-      <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl flex flex-col justify-between p-6 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative overflow-hidden">
+      
+      {/* 1. Fondo exterior con la imagen de patitas */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-70 pointer-events-none z-0"
+        style={{ backgroundImage: "url('/logologin.jpg')" }}
+      />
+
+  
+
+      {/* Tarjeta Central (se mantiene sólida y con z-10 para destacar sobre el fondo) */}
+      <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl flex flex-col justify-between p-6 text-white relative z-10 overflow-hidden">
         
         {/* Logo */}
         <div className="mt-4 md:mt-2 text-center">
@@ -165,7 +176,7 @@ const Login = () => {
               setActiveTabCliente('login');
               setModalTipo('cliente');
             }} 
-            className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
+            className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95 cursor-pointer"
           >
             INGRESAR COMO CLIENTE
           </button>
@@ -175,7 +186,7 @@ const Login = () => {
               setErrorMensaje(null);
               setModalTipo('veterinario');
             }} 
-            className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95"
+            className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95 cursor-pointer"
           >
             INGRESAR COMO VETERINARIO
           </button>
@@ -187,7 +198,7 @@ const Login = () => {
             <div className="bg-white text-gray-800 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative space-y-4">
               <button 
                 onClick={cerrarModal}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg"
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer"
               >
                 ✕
               </button>
@@ -229,7 +240,7 @@ const Login = () => {
                   <button 
                     type="submit" 
                     disabled={cargando}
-                    className="w-full bg-[#129b9b] hover:bg-[#0e7c7c] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2"
+                    className="w-full bg-[#129b9b] hover:bg-[#0e7c7c] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2 cursor-pointer"
                   >
                     {cargando ? 'VALIDANDO...' : 'INGRESAR AL SISTEMA'}
                   </button>
@@ -239,7 +250,6 @@ const Login = () => {
               {/* FLUJO CLIENTE */}
               {modalTipo === 'cliente' && (
                 <>
-                  {/* Vista de Login de Cliente */}
                   {activeTabCliente === 'login' && (
                     <form onSubmit={handleLoginCliente} className="space-y-2.5 text-xs">
                       <div className="space-y-2">
@@ -264,12 +274,11 @@ const Login = () => {
                       <button 
                         type="submit" 
                         disabled={cargando}
-                        className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2"
+                        className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2 cursor-pointer"
                       >
                         {cargando ? 'INGRESANDO...' : 'INGRESAR'}
                       </button>
 
-                      {/* Enlace para cambiar a registro */}
                       <p className="text-center text-[11px] text-gray-500 pt-2">
                         ¿No tenés una cuenta?{' '}
                         <button
@@ -286,7 +295,6 @@ const Login = () => {
                     </form>
                   )}
 
-                  {/* Vista de Registro de Cliente */}
                   {activeTabCliente === 'register' && (
                     <form onSubmit={handleRegisterCliente} className="space-y-2 text-xs">
                       <div className="space-y-1.5">
@@ -345,12 +353,11 @@ const Login = () => {
                       <button 
                         type="submit" 
                         disabled={cargando}
-                        className="w-full bg-[#129b9b] hover:bg-[#0d7878] text-white font-bold py-2.5 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-1"
+                        className="w-full bg-[#129b9b] hover:bg-[#0d7878] text-white font-bold py-2.5 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-1 cursor-pointer"
                       >
                         {cargando ? 'REGISTRANDO...' : 'REGISTRARME'}
                       </button>
 
-                      {/* Enlace para regresar a login */}
                       <p className="text-center text-[11px] text-gray-500 pt-2">
                         ¿Ya tenés cuenta?{' '}
                         <button
