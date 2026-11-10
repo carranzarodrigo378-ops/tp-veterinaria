@@ -14,8 +14,15 @@ const LaboratorioHub = () => {
   }, [role, navigate]);
 
   return (
-    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6">
-      <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-6 text-white flex flex-col justify-between">
+    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
+
+      {/* Fondo exterior */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/logologin.jpg')" }}
+      />
+
+      <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-6 text-white flex flex-col justify-between">
         <div>
           <div className="flex justify-between items-center mb-6">
             <button onClick={() => navigate('/home')} className="text-sm font-semibold hover:underline">‹ Volver al Menú</button>
@@ -29,7 +36,7 @@ const LaboratorioHub = () => {
 
           {/* Accesos Principales */}
           <div className="space-y-4">
-            <button 
+            <button
               onClick={() => navigate('/muestras')}
               className="w-full bg-white text-gray-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:bg-gray-50 transition-all group"
             >
@@ -43,7 +50,7 @@ const LaboratorioHub = () => {
               <span className="text-gray-400 font-bold group-hover:translate-x-1 transition-transform">›</span>
             </button>
 
-            <button 
+            <button
               onClick={() => navigate('/reportes')}
               className="w-full bg-white text-gray-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:bg-gray-50 transition-all group"
             >

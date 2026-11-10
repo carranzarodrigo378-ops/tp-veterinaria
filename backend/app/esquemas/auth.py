@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
+from app.esquemas.validadores import Telefono
 
 
 class RegistroCliente(BaseModel):
@@ -7,4 +8,4 @@ class RegistroCliente(BaseModel):
     password: str = Field(min_length=6, description="Contraseña de acceso")
     nombre: str = Field(min_length=1, description="Nombre de pila")
     apellido: str = Field(min_length=1, description="Apellido")
-    telefono: str = Field(default="", description="Teléfono de contacto")
+    telefono: Telefono = Field(default="", description="Teléfono de contacto")
