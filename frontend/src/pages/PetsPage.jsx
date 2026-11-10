@@ -15,6 +15,9 @@ const PetsPage = () => {
   // Estados principales
   const [mascotas, setMascotas] = useState([]);
   const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
+  
+  // NUEVO: Estado para el buscador
+  const [busqueda, setBusqueda] = useState('');
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -81,21 +84,23 @@ const PetsPage = () => {
     return response.json();
   };
 
-  // Obtener mascotas del cliente
+  // Obtener mascotas según el rol (Cliente o Veterinario/Admin)
   const obtenerMascotas = useCallback(async () => {
-    if (!idCliente || !Number.isInteger(idCliente)) {
-      setError('No se encontró un ID de cliente válido.');
-      setCargando(false);
-      return;
-    }
-
     try {
       setCargando(true);
       setError('');
+      let url = '';
 
-      const datos = await realizarPeticion(
-        `${API_URL}/clientes/${idCliente}/mascotas?incluir_inactivos=false`
-      );
+      if (rol === 'cliente') {
+        if (!idCliente || !Number.isInteger(idCliente)) {
+          throw new Error('No se encontró un ID de cliente válido.');
+        }
+        url = `${API_URL}/clientes/${idCliente}/mascotas?incluir_inactivos=false`;
+      } else {
+        url = `${API_URL}/mascotas?incluir_inactivos=false`;
+      }
+
+      const datos = await realizarPeticion(url);
 
       if (!Array.isArray(datos)) {
         throw new Error('La respuesta del servidor no tiene el formato esperado.');
@@ -109,19 +114,12 @@ const PetsPage = () => {
     } finally {
       setCargando(false);
     }
-  }, [idCliente]);
+  }, [idCliente, rol]);
 
   // Cargar mascotas al ingresar a la pantalla
   useEffect(() => {
-    if (rol === 'cliente') {
-      obtenerMascotas();
-    } else {
-      setCargando(false);
-      setError(
-        'Para visualizar todas las mascotas del veterinario necesitamos el endpoint global de listado.'
-      );
-    }
-  }, [obtenerMascotas, rol]);
+    obtenerMascotas();
+  }, [obtenerMascotas]);
 
   // Registrar mascota
   const handleCrearMascota = async (e) => {
@@ -164,18 +162,14 @@ const PetsPage = () => {
 
       console.log('Mascota registrada:', mascotaCreada);
 
-      // Si se accedió desde la pantalla de turnos, regresa con el ID de la nueva mascota
       if (location.state?.returnToTurnos) {
         const idMascotaId = mascotaCreada?.id_mascota || mascotaCreada?.id;
         navigate('/turnos', { state: { nuevaMascotaId: idMascotaId } });
         return;
       }
 
-      // Volver a consultar la base de datos si nos quedamos en PetsPage
       await obtenerMascotas();
-
       setMostrarModal(false);
-
       setNuevaMascota({
         nombre: '',
         especie: 'Perro',
@@ -200,9 +194,7 @@ const PetsPage = () => {
       const datos = await realizarPeticion(
         `${API_URL}/mascotas/${idMascota}`
       );
-
       setMascotaSeleccionada(datos);
-
     } catch (err) {
       console.error('Error al consultar mascota:', err);
       alert(err.message);
@@ -220,11 +212,8 @@ const PetsPage = () => {
     }
 
     const hoy = new Date();
-
     let edad = hoy.getFullYear() - nacimiento.getFullYear();
-
-    const diferenciaMes =
-      hoy.getMonth() - nacimiento.getMonth();
+    const diferenciaMes = hoy.getMonth() - nacimiento.getMonth();
 
     if (
       diferenciaMes < 0 ||
@@ -236,19 +225,24 @@ const PetsPage = () => {
     return edad < 0 ? 'No disponible' : `${edad} años`;
   };
 
+  // NUEVO: Lógica de filtrado
+  const mascotasFiltradas = mascotas.filter((mascota) => {
+    const texto = busqueda.toLowerCase();
+    return (
+      mascota.nombre?.toLowerCase().includes(texto) ||
+      mascota.id_cliente?.toString().includes(texto)
+    );
+  });
+
   // Vista de detalle
   if (mascotaSeleccionada) {
     return (
       <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4 relative">
-
-        {/* Fondo exterior */}
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/logologin.jpg')" }}
         />
-
         <div className="relative z-10 w-full max-w-md bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
-
           <button
             onClick={() => setMascotaSeleccionada(null)}
             className="mb-5 font-semibold hover:underline cursor-pointer"
@@ -257,55 +251,41 @@ const PetsPage = () => {
           </button>
 
           <div className="bg-white text-gray-800 rounded-2xl p-5 shadow-md space-y-3">
-
             <h2 className="text-xl font-bold text-[#129b9b] text-center">
               {mascotaSeleccionada.nombre}
             </h2>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">ID mascota:</span>
-              <strong>
-                {mascotaSeleccionada.id_mascota}
-              </strong>
+              <strong>{mascotaSeleccionada.id_mascota}</strong>
             </div>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">Nombre:</span>
               <strong>{mascotaSeleccionada.nombre}</strong>
             </div>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">Especie:</span>
               <strong>{mascotaSeleccionada.especie}</strong>
             </div>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">Raza:</span>
               <strong>{mascotaSeleccionada.raza}</strong>
             </div>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">Sexo:</span>
               <strong>{mascotaSeleccionada.sexo}</strong>
             </div>
-
             <div className="border-b pb-2 flex justify-between">
               <span className="text-gray-500">Nacimiento:</span>
               <strong>{mascotaSeleccionada.fecha_nacimiento}</strong>
             </div>
-
             <div className="flex justify-between">
               <span className="text-gray-500">Edad:</span>
-              <strong>
-                {calcularEdad(mascotaSeleccionada.fecha_nacimiento)}
-              </strong>
+              <strong>{calcularEdad(mascotaSeleccionada.fecha_nacimiento)}</strong>
             </div>
-
             <div className="flex justify-between">
               <span className="text-gray-500">ID cliente:</span>
               <strong>{mascotaSeleccionada.id_cliente}</strong>
             </div>
-
           </div>
         </div>
       </div>
@@ -315,36 +295,47 @@ const PetsPage = () => {
   // Listado de mascotas
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4 relative">
-
-      {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
       />
-
       <div className="relative z-10 w-full max-w-md min-h-[600px] bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
-
         <div className="flex justify-between items-center mb-6">
-
           <button
             onClick={() => navigate(location.state?.returnToTurnos ? '/turnos' : '/home')}
             className="text-sm font-semibold hover:underline cursor-pointer"
           >
             ‹ Volver
           </button>
-
           <div className="text-center">
             <h2 className="font-bold text-lg">
-              Mis Mascotas ({mascotas.length})
+              {rol === 'cliente' ? 'Mis Mascotas' : 'Padrón de Pacientes'} ({mascotasFiltradas.length})
             </h2>
-
-            <p className="text-[10px] text-cyan-100">
-              {nombreCliente} (ID: {idCliente})
-            </p>
+            {rol === 'cliente' ? (
+              <p className="text-[10px] text-cyan-100">
+                {nombreCliente} (ID: {idCliente})
+              </p>
+            ) : (
+              <p className="text-[10px] text-amber-300">
+                Vista de Staff Veterinario
+              </p>
+            )}
           </div>
-
           <div className="w-10" />
         </div>
+
+        {/* NUEVO: Barra de búsqueda */}
+        {!cargando && !error && (mascotas.length > 0 || busqueda !== '') && (
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder={rol === 'cliente' ? "Buscar por nombre..." : "Buscar mascota o ID tutor..."}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="w-full bg-white/10 text-white placeholder-cyan-100/70 border border-white/20 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+            />
+          </div>
+        )}
 
         {/* Estado de carga */}
         {cargando && (
@@ -357,7 +348,6 @@ const PetsPage = () => {
         {!cargando && error && (
           <div className="bg-red-100 text-red-700 p-4 rounded-xl text-sm">
             {error}
-
             <button
               onClick={obtenerMascotas}
               className="block mt-2 font-bold underline cursor-pointer"
@@ -367,33 +357,27 @@ const PetsPage = () => {
           </div>
         )}
 
-        {/* Listado */}
+        {/* Listado Filtrado */}
         {!cargando && !error && (
           <div className="space-y-3">
-
-            {mascotas.length > 0 ? (
-              mascotas.map((mascota) => (
-
+            {mascotasFiltradas.length > 0 ? (
+              mascotasFiltradas.map((mascota) => (
                 <div
                   key={mascota.id_mascota}
                   onClick={() => consultarMascota(mascota.id_mascota)}
                   className="bg-[#62c4c4] p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-[#5bb8b8] shadow-md transition-all"
                 >
-
                   <div>
                     <p className="font-bold text-base">
                       {mascota.nombre}
                     </p>
-
                     <p className="text-xs text-cyan-50">
-                      {mascota.especie} - {mascota.raza}
+                      {mascota.especie} • {mascota.raza}
                     </p>
-
                     <p className="text-xs text-cyan-50 mt-1">
                       {calcularEdad(mascota.fecha_nacimiento)}
                     </p>
                   </div>
-
                   <span className="text-2xl">
                     {mascota.especie?.toLowerCase() === 'gato'
                       ? '🐱'
@@ -401,76 +385,56 @@ const PetsPage = () => {
                         ? '🐶'
                         : '🐾'}
                   </span>
-
                 </div>
               ))
             ) : (
               <div className="bg-white/10 p-6 rounded-2xl text-center text-sm">
-                Todavía no tenés mascotas registradas.
+                {busqueda ? 'No se encontraron mascotas con esa búsqueda.' : 'Todavía no tenés mascotas registradas.'}
               </div>
             )}
 
-            <button
-              onClick={() => setMostrarModal(true)}
-              className="w-full bg-[#62c4c4] p-4 rounded-2xl flex items-center justify-center font-bold border-2 border-dashed border-white/40 hover:bg-[#5bb8b8] cursor-pointer"
-            >
-              + Agregar Nueva Mascota
-            </button>
-
+            {rol === 'cliente' && (
+              <button
+                onClick={() => setMostrarModal(true)}
+                className="w-full bg-[#62c4c4] p-4 rounded-2xl flex items-center justify-center font-bold border-2 border-dashed border-white/40 hover:bg-[#5bb8b8] cursor-pointer mt-4"
+              >
+                + Agregar Nueva Mascota
+              </button>
+            )}
           </div>
         )}
 
-        {/* Modal de registro */}
+        {/* Modal de registro (sin cambios) */}
         {mostrarModal && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-
             <div className="bg-white text-gray-800 p-5 rounded-3xl w-full max-w-sm space-y-4 shadow-2xl">
-
               <h3 className="font-bold text-[#129b9b] text-center text-lg">
                 Registrar Mascota
               </h3>
-
-              <form
-                onSubmit={handleCrearMascota}
-                className="space-y-3"
-              >
-
+              <form onSubmit={handleCrearMascota} className="space-y-3">
                 {/* Nombre */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     Nombre *
                   </label>
-
                   <input
                     type="text"
                     required
                     value={nuevaMascota.nombre}
-                    onChange={(e) =>
-                      setNuevaMascota({
-                        ...nuevaMascota,
-                        nombre: e.target.value
-                      })
-                    }
+                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, nombre: e.target.value })}
                     className="w-full border border-gray-200 p-2.5 rounded-xl"
                     placeholder="Ej: Nefer"
                   />
                 </div>
-
                 {/* Especie */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     Especie *
                   </label>
-
                   <select
                     required
                     value={nuevaMascota.especie}
-                    onChange={(e) =>
-                      setNuevaMascota({
-                        ...nuevaMascota,
-                        especie: e.target.value
-                      })
-                    }
+                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, especie: e.target.value })}
                     className="w-full border border-gray-200 p-2.5 rounded-xl bg-white"
                   >
                     <option value="Perro">Perro 🐶</option>
@@ -480,74 +444,51 @@ const PetsPage = () => {
                     <option value="Otro">Otro 🐾</option>
                   </select>
                 </div>
-
                 {/* Raza */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     Raza *
                   </label>
-
                   <input
                     type="text"
                     required
                     value={nuevaMascota.raza}
-                    onChange={(e) =>
-                      setNuevaMascota({
-                        ...nuevaMascota,
-                        raza: e.target.value
-                      })
-                    }
+                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, raza: e.target.value })}
                     className="w-full border border-gray-200 p-2.5 rounded-xl"
                     placeholder="Ej: Carey, Caniche"
                   />
                 </div>
-
                 {/* Sexo */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     Sexo *
                   </label>
-
                   <select
                     required
                     value={nuevaMascota.sexo}
-                    onChange={(e) =>
-                      setNuevaMascota({
-                        ...nuevaMascota,
-                        sexo: e.target.value
-                      })
-                    }
+                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, sexo: e.target.value })}
                     className="w-full border border-gray-200 p-2.5 rounded-xl bg-white"
                   >
                     <option value="macho">Macho</option>
                     <option value="hembra">Hembra</option>
                   </select>
                 </div>
-
                 {/* Fecha de nacimiento */}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 mb-1">
                     Fecha de nacimiento *
                   </label>
-
                   <input
                     type="date"
                     required
                     max={new Date().toISOString().split('T')[0]}
                     value={nuevaMascota.fecha_nacimiento}
-                    onChange={(e) =>
-                      setNuevaMascota({
-                        ...nuevaMascota,
-                        fecha_nacimiento: e.target.value
-                      })
-                    }
+                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, fecha_nacimiento: e.target.value })}
                     className="w-full border border-gray-200 p-2.5 rounded-xl"
                   />
                 </div>
-
                 {/* Botones */}
                 <div className="flex gap-2 pt-2">
-
                   <button
                     type="button"
                     onClick={() => {
@@ -562,7 +503,6 @@ const PetsPage = () => {
                   >
                     Cancelar
                   </button>
-
                   <button
                     type="submit"
                     disabled={guardando}
@@ -570,14 +510,11 @@ const PetsPage = () => {
                   >
                     {guardando ? 'Guardando...' : 'Guardar'}
                   </button>
-
                 </div>
-
               </form>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
