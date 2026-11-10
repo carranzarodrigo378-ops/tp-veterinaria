@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.rutas import (
     auth,
@@ -9,7 +9,7 @@ from app.rutas import (
     reportes,
 )
 from app.persistencia.conexion import DatabaseSingleton
-from app.core.seguridad import hashear_password
+from app.core.seguridad import hashear_password, decodificar_token, crear_token_acceso
 
 # 1. Crear las tablas si no existen según schema.sql
 db = DatabaseSingleton()
@@ -132,13 +132,53 @@ origins = [
     "http://127.0.0.1:5173",
 ]
 
+@app.middleware("http")
+async def renovar_token_por_interaccion(request: Request, call_next):
+    response = await call_next(request)
+
+    # Si la petición fue exitosa y traía un token válido, emitimos uno fresco en el header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer ") and response.status_code < 400:
+        token = auth_header.split(" ")[1]
+        payload = decodificar_token(token)
+        if payload and "sub" in payload and "rol" in payload:
+            token_renovado = crear_token_acceso({"sub": payload["sub"], "rol": payload["rol"]})
+            response.headers["X-Renewed-Token"] = token_renovado
+
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Renewed-Token"],
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Renewed-Token"],
+)
+
+@app.middleware("http")
+async def renovar_token_por_interaccion(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Si la petición fue exitosa y traía un token válido, emitimos uno fresco en el header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer ") and response.status_code < 400:
+        token = auth_header.split(" ")[1]
+        payload = decodificar_token(token)
+        if payload and "sub" in payload and "rol" in payload:
+            token_renovado = crear_token_acceso({"sub": payload["sub"], "rol": payload["rol"]})
+            response.headers["X-Renewed-Token"] = token_renovado
+            
+    return response
 
 # Registro de routers
 app.include_router(auth.router)
