@@ -10,6 +10,7 @@ from app.core.seguridad import (
 )
 from app.rutas.dependencias import requerir_rol
 from app.persistencia.conexion import DatabaseSingleton
+from app.rutas.dependencias import obtener_usuario_actual
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
@@ -213,3 +214,22 @@ def listar_usuarios_registrados():
         "SELECT id_usuario, usuario, rol, nombre, apellido, email, matricula, id_cliente, id_veterinario FROM usuarios"
     )
     return [dict(fila) for fila in cursor.fetchall()]
+
+
+@router.post("/extender-sesion")
+def extender_sesion(usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """
+    Emite un nuevo token JWT reiniciando el tiempo de expiración
+    a partir de la última interacción del usuario.
+    """
+    username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+    rol = usuario_actual.get("rol")
+
+    nuevo_token = crear_token_acceso(datos={"sub": username, "rol": rol})
+    return {
+        "mensaje": "Sesión extendida exitosamente.",
+        "access_token": nuevo_token,
+        "token_type": "bearer",
+        "usuario": username,
+        "rol": rol,
+    }
