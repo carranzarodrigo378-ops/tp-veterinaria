@@ -94,8 +94,15 @@ const TurnosPage = () => {
     misMascotas.find((m) => String(m.id) === String(formData.mascotaId))?.nombre || 'Mascota';
 
   return (
-    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6">
-      <div className="w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white flex flex-col justify-between overflow-y-auto">
+    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
+
+      {/* Fondo exterior */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/logologin.jpg')" }}
+      />
+
+      <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white flex flex-col justify-between overflow-y-auto">
         <div>
           {/* Top Bar */}
           <div className="flex justify-between items-center mb-4">
