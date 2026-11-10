@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axiosConfig';
 
 const TurnosPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [submitted, setSubmitted] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
-  // Obtener la fecha actual en formato YYYY-MM-DD para bloquear días pasados
+  // Fecha actual en formato YYYY-MM-DD para bloquear días pasados
   const today = new Date().toISOString().split('T')[0];
 
   // Lista dinámicamente obtenida desde el Backend
@@ -22,11 +24,7 @@ const TurnosPage = () => {
     motivo: '',
   });
 
-  // Estado para el formulario rápido de nueva mascota
-  const [isAddingPet, setIsAddingPet] = useState(false);
-  const [nuevaMascota, setNuevaMascota] = useState({ nombre: '', especie: 'Perro', raza: '' });
-
-  // 1. Cargar las mascotas del cliente logueado
+  // 1. Cargar las mascotas del cliente logueado desde el Backend
   const cargarMascotas = async () => {
     const clientId = localStorage.getItem('clientId');
     if (!clientId) return;
@@ -36,8 +34,10 @@ const TurnosPage = () => {
       const lista = res.data || [];
       setMisMascotas(lista);
 
-      // Asignar la primera mascota por defecto si no hay ninguna elegida
-      if (lista.length > 0 && !formData.mascotaId) {
+      // Si volvemos de registrar una mascota nueva desde PetsPage, la seleccionamos
+      if (location.state?.nuevaMascotaId) {
+        setFormData((prev) => ({ ...prev, mascotaId: String(location.state.nuevaMascotaId) }));
+      } else if (lista.length > 0 && !formData.mascotaId) {
         setFormData((prev) => ({ ...prev, mascotaId: String(lista[0].id) }));
       }
     } catch (err) {
@@ -47,55 +47,19 @@ const TurnosPage = () => {
 
   useEffect(() => {
     cargarMascotas();
-  }, []);
+  }, [location.state]);
 
   const handleMascotaChange = (e) => {
     const value = e.target.value;
-    if (value === 'NUEVA') {
-      setIsAddingPet(true);
+    if (value === 'IR_A_REGISTRO') {
+      // Redirige a PetsPage manteniendo la sesión activa y pasando la señal de retorno
+      navigate('/pets', { state: { returnToTurnos: true } });
     } else {
-      setIsAddingPet(false);
       setFormData({ ...formData, mascotaId: value });
     }
   };
 
-  // 2. Crear nueva mascota y guardarla en el Backend
-  const handleCrearMascotaYAsignar = async (e) => {
-    e.preventDefault();
-    if (!nuevaMascota.nombre.trim()) return;
-
-    const clientId = localStorage.getItem('clientId');
-    setCargando(true);
-    setError('');
-
-    try {
-      // POST al endpoint de mascotas
-      const res = await api.post('/api/mascotas', {
-        nombre: nuevaMascota.nombre.trim(),
-        especie: nuevaMascota.especie,
-        raza: nuevaMascota.raza.trim() || 'Desconocida',
-        id_cliente: clientId ? parseInt(clientId, 10) : null,
-      });
-
-      const petCreada = res.data;
-
-      // Actualizar lista de mascotas local y seleccionar la nueva
-      const listaActualizada = [...misMascotas, petCreada];
-      setMisMascotas(listaActualizada);
-      setFormData({ ...formData, mascotaId: String(petCreada.id) });
-
-      // Resetear estado de agregar
-      setIsAddingPet(false);
-      setNuevaMascota({ nombre: '', especie: 'Perro', raza: '' });
-    } catch (err) {
-      console.error('Error al guardar mascota:', err);
-      setError('No se pudo guardar la mascota. Intente nuevamente.');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  // 3. Confirmar Cita / Solicitar Turno en Backend
+  // 2. Confirmar Cita / Solicitar Turno en Backend
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.mascotaId) {
@@ -135,8 +99,11 @@ const TurnosPage = () => {
         <div>
           {/* Top Bar */}
           <div className="flex justify-between items-center mb-4">
-            <button onClick={() => navigate('/home')} className="text-sm font-semibold flex items-center gap-1 hover:underline">
-              ‹ Back
+            <button
+              onClick={() => navigate('/home')}
+              className="text-sm font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              ‹ Volver
             </button>
             <h2 className="font-bold text-lg">Pedir Cita</h2>
             <div className="w-6"></div>
@@ -179,11 +146,11 @@ const TurnosPage = () => {
                   Seleccionar Mascota
                 </label>
                 <select
-                  value={isAddingPet ? 'NUEVA' : formData.mascotaId}
+                  value={formData.mascotaId}
                   onChange={handleMascotaChange}
-                  className="w-full bg-white text-gray-800 rounded-xl p-3 text-xs font-medium focus:outline-none border-0"
+                  className="w-full bg-white text-gray-800 rounded-xl p-3 text-xs font-medium focus:outline-none border-0 cursor-pointer"
                 >
-                  {misMascotas.length === 0 && !isAddingPet && (
+                  {misMascotas.length === 0 && (
                     <option value="" disabled>-- No tenés mascotas registradas --</option>
                   )}
                   {misMascotas.map((m) => (
@@ -191,45 +158,11 @@ const TurnosPage = () => {
                       🐾 {m.nombre} ({m.especie})
                     </option>
                   ))}
-                  <option value="NUEVA" className="font-bold text-[#129b9b]">
+                  <option value="IR_A_REGISTRO" className="font-bold text-[#129b9b]">
                     ➕ Registrar nueva mascota...
                   </option>
                 </select>
               </div>
-
-              {/* Formulario rápido desplegable si no tiene o quiere agregar una nueva */}
-              {isAddingPet && (
-                <div className="bg-white/10 p-3 rounded-2xl border border-white/30 space-y-2 text-xs">
-                  <p className="font-bold text-pink-200">Registrar nueva mascota:</p>
-                  <input
-                    type="text"
-                    placeholder="Nombre de la mascota *"
-                    required
-                    value={nuevaMascota.nombre}
-                    onChange={(e) => setNuevaMascota({ ...nuevaMascota, nombre: e.target.value })}
-                    className="w-full bg-white text-gray-800 p-2 rounded-lg"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={nuevaMascota.especie}
-                      onChange={(e) => setNuevaMascota({ ...nuevaMascota, especie: e.target.value })}
-                      className="bg-white text-gray-800 p-2 rounded-lg"
-                    >
-                      <option value="Perro">Perro</option>
-                      <option value="Gato">Gato</option>
-                      <option value="Otro">Otro</option>
-                    </select>
-                    <button
-                      type="button"
-                      disabled={cargando}
-                      onClick={handleCrearMascotaYAsignar}
-                      className="bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold rounded-lg px-2 py-1 cursor-pointer"
-                    >
-                      {cargando ? 'Guardando...' : 'Guardar y Elegir'}
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Tipo de Servicio */}
               <div>
@@ -288,7 +221,7 @@ const TurnosPage = () => {
 
               <button
                 type="submit"
-                disabled={isAddingPet || cargando || misMascotas.length === 0}
+                disabled={cargando || misMascotas.length === 0}
                 className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] disabled:bg-gray-400 text-white font-bold py-3.5 rounded-full shadow-lg text-xs tracking-wider transition-transform active:scale-95 mt-2 cursor-pointer"
               >
                 {cargando ? 'PROCESANDO...' : 'CONFIRMAR CITA'}

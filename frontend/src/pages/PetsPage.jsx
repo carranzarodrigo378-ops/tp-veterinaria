@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const API_URL = 'http://127.0.0.1:8000/api/clinica';
 
 const PetsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Datos de sesión
   const rol = localStorage.getItem('role') || 'cliente';
@@ -19,8 +20,8 @@ const PetsPage = () => {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
 
-  // Modal de registro
-  const [mostrarModal, setMostrarModal] = useState(false);
+  // Modal de registro (si venimos redirigidos de turnos, se abre por defecto)
+  const [mostrarModal, setMostrarModal] = useState(location.state?.returnToTurnos || false);
 
   // Formulario en español, igual que FastAPI
   const [nuevaMascota, setNuevaMascota] = useState({
@@ -163,7 +164,14 @@ const PetsPage = () => {
 
       console.log('Mascota registrada:', mascotaCreada);
 
-      // Volver a consultar la base de datos
+      // Si se accedió desde la pantalla de turnos, regresa con el ID de la nueva mascota
+      if (location.state?.returnToTurnos) {
+        const idMascotaId = mascotaCreada?.id_mascota || mascotaCreada?.id;
+        navigate('/turnos', { state: { nuevaMascotaId: idMascotaId } });
+        return;
+      }
+
+      // Volver a consultar la base de datos si nos quedamos en PetsPage
       await obtenerMascotas();
 
       setMostrarModal(false);
@@ -243,7 +251,7 @@ const PetsPage = () => {
 
           <button
             onClick={() => setMascotaSeleccionada(null)}
-            className="mb-5 font-semibold hover:underline"
+            className="mb-5 font-semibold hover:underline cursor-pointer"
           >
             ← Volver a mascotas
           </button>
@@ -319,8 +327,8 @@ const PetsPage = () => {
         <div className="flex justify-between items-center mb-6">
 
           <button
-            onClick={() => navigate('/home')}
-            className="text-sm font-semibold hover:underline"
+            onClick={() => navigate(location.state?.returnToTurnos ? '/turnos' : '/home')}
+            className="text-sm font-semibold hover:underline cursor-pointer"
           >
             ‹ Volver
           </button>
@@ -331,7 +339,7 @@ const PetsPage = () => {
             </h2>
 
             <p className="text-[10px] text-cyan-100">
-              {nombreCliente} - Cliente {idCliente}
+              {nombreCliente} (ID: {idCliente})
             </p>
           </div>
 
@@ -352,7 +360,7 @@ const PetsPage = () => {
 
             <button
               onClick={obtenerMascotas}
-              className="block mt-2 font-bold underline"
+              className="block mt-2 font-bold underline cursor-pointer"
             >
               Reintentar
             </button>
@@ -378,7 +386,7 @@ const PetsPage = () => {
                     </p>
 
                     <p className="text-xs text-cyan-50">
-                      {mascota.especie} • {mascota.raza}
+                      {mascota.especie} - {mascota.raza}
                     </p>
 
                     <p className="text-xs text-cyan-50 mt-1">
@@ -404,7 +412,7 @@ const PetsPage = () => {
 
             <button
               onClick={() => setMostrarModal(true)}
-              className="w-full bg-[#62c4c4] p-4 rounded-2xl flex items-center justify-center font-bold border-2 border-dashed border-white/40 hover:bg-[#5bb8b8]"
+              className="w-full bg-[#62c4c4] p-4 rounded-2xl flex items-center justify-center font-bold border-2 border-dashed border-white/40 hover:bg-[#5bb8b8] cursor-pointer"
             >
               + Agregar Nueva Mascota
             </button>
@@ -542,9 +550,15 @@ const PetsPage = () => {
 
                   <button
                     type="button"
-                    onClick={() => setMostrarModal(false)}
+                    onClick={() => {
+                      if (location.state?.returnToTurnos) {
+                        navigate('/turnos');
+                      } else {
+                        setMostrarModal(false);
+                      }
+                    }}
                     disabled={guardando}
-                    className="w-1/2 bg-gray-100 text-gray-600 py-2.5 rounded-xl font-bold"
+                    className="w-1/2 bg-gray-100 text-gray-600 py-2.5 rounded-xl font-bold cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -552,7 +566,7 @@ const PetsPage = () => {
                   <button
                     type="submit"
                     disabled={guardando}
-                    className="w-1/2 bg-[#129b9b] text-white py-2.5 rounded-xl font-bold shadow disabled:opacity-50"
+                    className="w-1/2 bg-[#129b9b] text-white py-2.5 rounded-xl font-bold shadow disabled:opacity-50 cursor-pointer"
                   >
                     {guardando ? 'Guardando...' : 'Guardar'}
                   </button>
@@ -570,4 +584,3 @@ const PetsPage = () => {
 };
 
 export default PetsPage;
-
