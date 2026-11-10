@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -232,9 +231,15 @@ const PetsPage = () => {
   // Vista de detalle
   if (mascotaSeleccionada) {
     return (
-      <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4 relative">
 
-        <div className="w-full max-w-md bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
+        {/* Fondo exterior */}
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/logologin.jpg')" }}
+        />
+
+        <div className="relative z-10 w-full max-w-md bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
 
           <button
             onClick={() => setMascotaSeleccionada(null)}
@@ -301,9 +306,15 @@ const PetsPage = () => {
 
   // Listado de mascotas
   return (
-    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4 relative">
 
-      <div className="w-full max-w-md min-h-[600px] bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
+      {/* Fondo exterior */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/logologin.jpg')" }}
+      />
+
+      <div className="relative z-10 w-full max-w-md min-h-[600px] bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
 
         <div className="flex justify-between items-center mb-6">
 
@@ -559,3 +570,4 @@ const PetsPage = () => {
 };
 
 export default PetsPage;
+

@@ -321,7 +321,7 @@ const HomeMenu = () => {
           <div className="relative z-10 my-auto py-8">
             <h2 className="text-4xl sm:text-5xl font-black leading-tight tracking-tight drop-shadow-sm">
               Cuidamos siempre <br />
-              de tu <span className="text-[#f1adb6] underline decoration-wavy decoration-[#f1adb6]/60">mejor amigo</span>.
+              de tu <span className="text-[#f1adb6] [#f1adb6]/60">mejor amigo</span>.
             </h2>
             <p className="mt-5 text-cyan-50 text-base md:text-lg max-w-lg font-normal leading-relaxed">
               En <strong className="font-bold">Vet2Gö</strong> combinamos tecnología ágil, calidez humana y medicina preventiva para acompañar cada etapa de la vida de tu mascota.

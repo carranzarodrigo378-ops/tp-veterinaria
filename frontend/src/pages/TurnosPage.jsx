@@ -67,7 +67,7 @@ const TurnosPage = () => {
           {/* Top Bar */}
           <div className="flex justify-between items-center mb-4">
             <button onClick={() => navigate('/home')} className="text-sm font-semibold flex items-center gap-1 hover:underline">
-              ‹ Back
+              ‹ Volver
             </button>
             <h2 className="font-bold text-lg">Pedir Cita</h2>
             <div className="w-6"></div>
