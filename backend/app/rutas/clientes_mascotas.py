@@ -55,6 +55,19 @@ def dar_baja_logica_cliente(id_cliente: int):
 
 # --- ENDPOINTS DE MASCOTAS ---
 
+@router.get(
+    "/mascotas",
+    response_model=list[MascotaRespuesta],
+    dependencies=[Depends(obtener_usuario_actual)],
+)
+def listar_todas_las_mascotas(
+    incluir_inactivos: bool = Query(
+        default=False,
+        description="Si es True, incluye también las mascotas dadas de baja lógicamente",
+    ),
+):
+    return servicio_clinica.listar_mascotas(incluir_inactivos=incluir_inactivos)
+
 @router.post(
     "/mascotas",
     response_model=MascotaRespuesta,

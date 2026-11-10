@@ -41,6 +41,11 @@ class ClinicaServicio:
         return self.obtener_cliente(id_cliente)
 
     # --- MASCOTAS ---
+    def listar_mascotas(self, incluir_inactivos: bool = False) -> list[dict]:
+        return self.mascota_dao.obtener_todos(
+            limite=500, incluir_inactivos=incluir_inactivos
+        )
+    
     def registrar_mascota(self, datos_mascota: MascotaCrear) -> dict:
         # Regla de negocio y validación de existencia del responsable activo
         if not self.cliente_dao.existe(datos_mascota.id_cliente):
