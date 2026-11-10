@@ -3,6 +3,7 @@ from app.esquemas.mascotas import MascotaCrear, MascotaActualizar
 from app.esquemas.enums import Sexo
 from app.persistencia.cliente_dao import ClienteDAO
 from app.persistencia.mascota_dao import MascotaDAO
+from app.persistencia.conexion import DatabaseSingleton
 from app.persistencia.excepciones import (
     ResponsableInexistenteError,
     ClienteDuplicadoError,
@@ -14,6 +15,7 @@ class ClinicaServicio:
     def __init__(self, cliente_dao: ClienteDAO = None, mascota_dao: MascotaDAO = None):
         self.cliente_dao = cliente_dao or ClienteDAO()
         self.mascota_dao = mascota_dao or MascotaDAO()
+        self.db = DatabaseSingleton()
 
     # --- CLIENTES ---
     def registrar_cliente(self, datos_cliente: dict) -> dict:
@@ -45,7 +47,7 @@ class ClinicaServicio:
         return self.mascota_dao.obtener_todos(
             limite=500, incluir_inactivos=incluir_inactivos
         )
-    
+
     def registrar_mascota(self, datos_mascota: MascotaCrear) -> dict:
         # Regla de negocio y validación de existencia del responsable activo
         if not self.cliente_dao.existe(datos_mascota.id_cliente):
@@ -105,6 +107,118 @@ class ClinicaServicio:
         if not mascota:
             raise KeyError(f"No existe la mascota con ID {id_mascota}")
         return mascota
+
+    # --- TURNOS ---
+    def listar_turnos(
+        self,
+        veterinario_id: int | None = None,
+        id_mascota: int | None = None,
+        fecha: str | None = None,
+        estado: str | None = None,
+    ) -> list[dict]:
+        conn = self.db.get_conexion()
+        query = """
+            SELECT 
+                t.id_turno,
+                t.fecha_hora,
+                t.motivo,
+                t.estado,
+                t.mascota_id AS id_mascota,
+                m.nombre AS mascota_nombre,
+                m.especie,
+                c.id_cliente,
+                c.nombre || ' ' || c.apellido AS cliente_nombre,
+                t.veterinario_id AS id_veterinario,
+                v.nombre || ' ' || v.apellido AS veterinario_nombre,
+                t.clinica_id AS id_clinica,
+                cl.nombre AS clinica_nombre
+            FROM turnos t
+            JOIN mascotas m ON t.mascota_id = m.id_mascota
+            JOIN clientes c ON m.id_cliente = c.id_cliente
+            JOIN veterinarios v ON t.veterinario_id = v.id_veterinario
+            JOIN clinicas cl ON t.clinica_id = cl.id_clinica
+            WHERE 1=1
+        """
+        params: list = []
+
+        if veterinario_id is not None:
+            query += " AND t.veterinario_id = ?"
+            params.append(veterinario_id)
+        if id_mascota is not None:
+            query += " AND t.mascota_id = ?"
+            params.append(id_mascota)
+        if fecha:
+            query += " AND date(t.fecha_hora) = date(?)"
+            params.append(fecha)
+        if estado:
+            query += " AND t.estado = ?"
+            params.append(estado)
+
+        query += " ORDER BY t.fecha_hora ASC"
+        cursor = conn.execute(query, tuple(params))
+        return [dict(fila) for fila in cursor.fetchall()]
+
+    def programar_turno(
+        self,
+        id_mascota: int,
+        id_veterinario: int,
+        fecha_hora: str,
+        motivo: str,
+        id_clinica: int = 1,
+    ) -> dict:
+        if not self.mascota_dao.existe(id_mascota):
+            raise KeyError("La mascota indicada no existe o está dada de baja.")
+
+        conn = self.db.get_conexion()
+        cursor = conn.cursor()
+
+        superpuesto = cursor.execute(
+            """
+            SELECT id_turno FROM turnos 
+            WHERE veterinario_id = ? 
+              AND fecha_hora = ? 
+              AND estado = 'programado'
+            """,
+            (id_veterinario, fecha_hora),
+        ).fetchone()
+
+        if superpuesto:
+            raise ValueError(
+                "El veterinario seleccionado ya tiene un turno programado en ese horario."
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO turnos (mascota_id, veterinario_id, clinica_id, fecha_hora, motivo, estado)
+            VALUES (?, ?, ?, ?, ?, 'programado')
+            """,
+            (id_mascota, id_veterinario, id_clinica, fecha_hora, motivo),
+        )
+        conn.commit()
+        return {
+            "id_turno": cursor.lastrowid,
+            "id_mascota": id_mascota,
+            "id_veterinario": id_veterinario,
+            "id_clinica": id_clinica,
+            "fecha_hora": fecha_hora,
+            "motivo": motivo,
+            "estado": "programado",
+        }
+
+    def cambiar_estado_turno(self, id_turno: int, nuevo_estado: str) -> dict:
+        conn = self.db.get_conexion()
+        cursor = conn.execute(
+            "UPDATE turnos SET estado = ? WHERE id_turno = ?",
+            (nuevo_estado, id_turno),
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise KeyError(f"No existe el turno con ID {id_turno}")
+        return {
+            "mensaje": "Estado del turno actualizado",
+            "id_turno": id_turno,
+            "estado": nuevo_estado,
+        }
 
 
 servicio_clinica = ClinicaServicio()
