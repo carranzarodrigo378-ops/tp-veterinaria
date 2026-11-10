@@ -23,13 +23,15 @@ class ReportesDAO(BaseDAO):
         return [dict(fila) for fila in cursor.fetchall()]
 
     # ------------------------------------------------------------------
-    # GET /resumen-general
+    # 1. GET /resumen-general
     # ------------------------------------------------------------------
     def resumen_general(self) -> dict:
         sql = """
             SELECT
                 (SELECT COUNT(*) FROM clientes WHERE activo = 1)      AS clientes_activos,
+                (SELECT COUNT(*) FROM clientes WHERE activo = 0)      AS clientes_baja_logica,
                 (SELECT COUNT(*) FROM mascotas WHERE activo = 1)      AS mascotas_activas,
+                (SELECT COUNT(*) FROM mascotas WHERE activo = 0)      AS mascotas_baja_logica,
                 (SELECT COUNT(*) FROM clinicas WHERE activa = 1)      AS clinicas_activas,
                 (SELECT COUNT(*) FROM veterinarios)                   AS total_veterinarios,
                 (SELECT COUNT(*) FROM consultas)                      AS total_consultas,
@@ -38,12 +40,14 @@ class ReportesDAO(BaseDAO):
                 (SELECT COUNT(*) FROM ordenes_derivacion)             AS total_derivaciones,
                 (SELECT COUNT(*) FROM muestras)                       AS total_muestras,
                 (SELECT COUNT(*) FROM remitos_biologicos
-                  WHERE estado = 'en_transito')                       AS remitos_en_transito
+                  WHERE estado = 'en_transito')                       AS remitos_en_transito,
+                (SELECT COALESCE(ROUND(SUM(total), 2), 0)
+                   FROM comprobantes)                                 AS facturacion_total
         """
         return self._consultar(sql)[0]
 
     # ------------------------------------------------------------------
-    # GET /calidad-muestras
+    # 2. GET /calidad-muestras
     # ------------------------------------------------------------------
     def rechazo_muestras(self) -> list[dict]:
         sql = """
@@ -51,7 +55,9 @@ class ReportesDAO(BaseDAO):
                 l.id_laboratorio,
                 l.nombre AS laboratorio,
                 COUNT(*) AS total_muestras,
+                SUM(CASE WHEN mu.estado_actual = 'analizada' THEN 1 ELSE 0 END) AS analizadas,
                 SUM(CASE WHEN mu.estado_actual = 'rechazada' THEN 1 ELSE 0 END) AS rechazadas,
+                SUM(CASE WHEN mu.estado_actual NOT IN ('analizada', 'rechazada') THEN 1 ELSE 0 END) AS en_proceso,
                 ROUND(100.0 * SUM(CASE WHEN mu.estado_actual = 'rechazada' THEN 1 ELSE 0 END)
                       / COUNT(*), 2) AS porcentaje_rechazo
             FROM muestras mu
@@ -63,7 +69,7 @@ class ReportesDAO(BaseDAO):
         return self._consultar(sql)
 
     # ------------------------------------------------------------------
-    # GET /derivaciones-tipo
+    # 3. GET /derivaciones-tipo
     # ------------------------------------------------------------------
     def derivaciones_por_tipo(self) -> list[dict]:
         sql = """
@@ -71,22 +77,20 @@ class ReportesDAO(BaseDAO):
                 t.id_tipo_analisis,
                 t.nombre AS tipo_analisis,
                 t.tipo_muestra,
-                COUNT(*) AS total_derivaciones
+                COUNT(od.id_orden_derivacion) AS total_derivaciones,
+                COALESCE(t.precio, 0) AS precio_unitario,
+                ROUND(COUNT(od.id_orden_derivacion) * COALESCE(t.precio, 0), 2) AS monto_estimado
             FROM ordenes_derivacion od
             JOIN tipo_analisis t ON t.id_tipo_analisis = od.tipo_analisis_id
-            GROUP BY t.id_tipo_analisis, t.nombre, t.tipo_muestra
+            GROUP BY t.id_tipo_analisis, t.nombre, t.tipo_muestra, t.precio
             ORDER BY total_derivaciones DESC
         """
         return self._consultar(sql)
 
     # ------------------------------------------------------------------
-    # GET /alertas-vacunas
+    # 4. GET /alertas-vacunas
     # ------------------------------------------------------------------
     def alertas_vacunacion(self, dias: int = 30) -> list[dict]:
-        # Toma la ÚLTIMA aplicación de cada vacuna por mascota (en SQLite, las
-        # columnas "sueltas" de un GROUP BY con MAX() salen de la fila del máximo).
-        # Si esa aplicación no tiene proxima_dosis, la calcula con el intervalo
-        # de refuerzo del esquema vacunal de la especie.
         sql = """
             SELECT *,
                    CASE WHEN date(proxima_dosis) < date('now', 'localtime')
@@ -125,7 +129,7 @@ class ReportesDAO(BaseDAO):
         return self._consultar(sql, [f"+{int(dias)} days"])
 
     # ------------------------------------------------------------------
-    # GET /atenciones  (consulta variable)
+    # 5. GET /atenciones  (consulta variable con filtros dinámicos)
     # ------------------------------------------------------------------
     def atenciones_dinamico(
         self,
@@ -161,7 +165,9 @@ class ReportesDAO(BaseDAO):
             FROM consultas c
             JOIN historias_clinicas h ON h.id_historia_clinica = c.historia_clinica_id
             JOIN mascotas m           ON m.id_mascota = h.id_mascota
+            JOIN clientes cli         ON cli.id_cliente = m.id_cliente
             JOIN veterinarios v       ON v.id_veterinario = c.veterinario_id
+            JOIN clinicas cl          ON cl.id_clinica = c.clinica_id
         """
 
         totales = self._consultar(
@@ -177,11 +183,32 @@ class ReportesDAO(BaseDAO):
             f"""
             SELECT v.id_veterinario,
                    v.nombre || ' ' || v.apellido AS veterinario,
-                   COUNT(*)                      AS atenciones,
-                   COUNT(DISTINCT m.id_mascota)  AS mascotas_distintas
+                   v.matricula,
+                   COUNT(*)                       AS atenciones,
+                   COUNT(DISTINCT m.id_mascota)   AS mascotas_distintas
             {desde} {where}
-            GROUP BY v.id_veterinario, v.nombre, v.apellido
+            GROUP BY v.id_veterinario, v.nombre, v.apellido, v.matricula
             ORDER BY atenciones DESC
+            """,
+            params,
+        )
+
+        detalle_atenciones = self._consultar(
+            f"""
+            SELECT c.id_consulta,
+                   c.fecha_hora,
+                   c.tipo AS tipo_atencion,
+                   c.motivo,
+                   COALESCE(c.diagnostico, 'Sin diagnóstico') AS diagnostico,
+                   m.id_mascota,
+                   m.nombre AS mascota,
+                   m.especie,
+                   cli.nombre || ' ' || cli.apellido AS duenio,
+                   v.id_veterinario,
+                   v.nombre || ' ' || v.apellido AS veterinario,
+                   cl.nombre AS clinica
+            {desde} {where}
+            ORDER BY c.fecha_hora DESC
             """,
             params,
         )
@@ -190,6 +217,7 @@ class ReportesDAO(BaseDAO):
             "total_atenciones": totales["total_atenciones"],
             "mascotas_distintas": totales["mascotas_distintas"],
             "por_veterinario": por_veterinario,
+            "detalle_atenciones": detalle_atenciones,
             "filtros_aplicados": {
                 "fecha_desde": self._iso(fecha_desde),
                 "fecha_hasta": self._iso(fecha_hasta),
@@ -197,6 +225,142 @@ class ReportesDAO(BaseDAO):
                 "clinica_id": clinica_id,
                 "especie": especie,
             },
+        }
+
+    # ------------------------------------------------------------------
+    # 6. GET /productividad-veterinarios
+    # ------------------------------------------------------------------
+    def productividad_veterinarios(self) -> list[dict]:
+        sql = """
+            SELECT
+                v.id_veterinario,
+                v.nombre || ' ' || v.apellido AS veterinario,
+                v.matricula,
+                cl.nombre AS clinica,
+                COUNT(DISTINCT c.id_consulta)          AS total_consultas,
+                COUNT(DISTINCT h.id_mascota)           AS mascotas_unicas_atendidas,
+                COUNT(DISTINCT o.id_orden_derivacion)  AS ordenes_derivadas
+            FROM veterinarios v
+            LEFT JOIN clinicas cl          ON v.clinica_id = cl.id_clinica
+            LEFT JOIN consultas c          ON c.veterinario_id = v.id_veterinario
+            LEFT JOIN historias_clinicas h ON c.historia_clinica_id = h.id_historia_clinica
+            LEFT JOIN ordenes_derivacion o ON o.id_consulta = c.id_consulta
+            GROUP BY v.id_veterinario, v.nombre, v.apellido, v.matricula, cl.nombre
+            ORDER BY total_consultas DESC
+        """
+        return self._consultar(sql)
+
+    # ------------------------------------------------------------------
+    # 7. GET /facturacion
+    # ------------------------------------------------------------------
+    def facturacion_detallada(self) -> dict:
+        por_rubro = self._consultar(
+            """
+            SELECT
+                tipo AS rubro,
+                SUM(cantidad) AS items_vendidos,
+                ROUND(SUM(cantidad * precio_unitario), 2) AS recaudacion
+            FROM item_comprobante
+            GROUP BY tipo
+            ORDER BY recaudacion DESC
+            """
+        )
+
+        comprobantes = self._consultar(
+            """
+            SELECT
+                comp.id_comprobante,
+                comp.numero,
+                comp.fecha_emision,
+                cl.nombre AS clinica,
+                cli.nombre || ' ' || cli.apellido AS cliente,
+                ROUND(comp.total, 2) AS total
+            FROM comprobantes comp
+            JOIN clinicas cl  ON comp.clinica_id = cl.id_clinica
+            JOIN clientes cli ON comp.cliente_id = cli.id_cliente
+            ORDER BY comp.fecha_emision DESC
+            """
+        )
+
+        total_general = sum(float(c["total"]) for c in comprobantes)
+        return {
+            "recaudacion_total": round(total_general, 2),
+            "cantidad_comprobantes": len(comprobantes),
+            "desglose_por_rubro": por_rubro,
+            "comprobantes_emitidos": comprobantes,
+        }
+
+    # ------------------------------------------------------------------
+    # 8. GET /turnos
+    # ------------------------------------------------------------------
+    def estado_turnos(self) -> dict:
+        resumen = self._consultar(
+            """
+            SELECT estado, COUNT(*) AS cantidad
+            FROM turnos
+            GROUP BY estado
+            """
+        )
+
+        detalle = self._consultar(
+            """
+            SELECT
+                t.id_turno,
+                t.fecha_hora,
+                t.estado,
+                t.motivo,
+                m.nombre AS mascota,
+                v.nombre || ' ' || v.apellido AS veterinario,
+                cl.nombre AS clinica
+            FROM turnos t
+            JOIN mascotas m     ON t.mascota_id = m.id_mascota
+            JOIN veterinarios v ON t.veterinario_id = v.id_veterinario
+            JOIN clinicas cl    ON t.clinica_id = cl.id_clinica
+            ORDER BY t.fecha_hora DESC
+            """
+        )
+
+        return {
+            "resumen_estados": resumen,
+            "detalle_turnos": detalle,
+        }
+
+    # ------------------------------------------------------------------
+    # 9. GET /demografia-mascotas
+    # ------------------------------------------------------------------
+    def demografia_mascotas(self) -> dict:
+        por_especie = self._consultar(
+            """
+            SELECT
+                LOWER(especie) AS especie,
+                COUNT(*) AS total,
+                SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) AS activas,
+                SUM(CASE WHEN activo = 0 THEN 1 ELSE 0 END) AS bajas_logicas
+            FROM mascotas
+            GROUP BY LOWER(especie)
+            ORDER BY total DESC
+            """
+        )
+
+        listado = self._consultar(
+            """
+            SELECT
+                m.id_mascota,
+                m.nombre AS mascota,
+                m.especie,
+                COALESCE(m.raza, 'Mestizo') AS raza,
+                m.sexo,
+                cli.nombre || ' ' || cli.apellido AS responsable,
+                CASE WHEN m.activo = 1 THEN 'Activo' ELSE 'Baja lógica' END AS estado
+            FROM mascotas m
+            JOIN clientes cli ON m.id_cliente = cli.id_cliente
+            ORDER BY m.id_mascota DESC
+            """
+        )
+
+        return {
+            "distribucion_especies": por_especie,
+            "padron_mascotas": listado,
         }
 
 
