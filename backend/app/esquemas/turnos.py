@@ -1,9 +1,6 @@
 from datetime import datetime
-
 from pydantic import BaseModel, model_validator
-
 from app.esquemas.enums import EstadoTurno
-
 
 class TurnoBase(BaseModel):
     fecha_hora_inicio: datetime
@@ -17,17 +14,24 @@ class TurnoBase(BaseModel):
             raise ValueError("La fecha de fin debe ser posterior a la de inicio")
         return self
 
-
 class TurnoCrear(TurnoBase):
     pass  # el estado inicial lo fija el sistema: programado
-
 
 class TurnoActualizar(BaseModel):
     fecha_hora_inicio: datetime | None = None
     fecha_hora_fin: datetime | None = None
     estado: EstadoTurno | None = None
 
-
 class TurnoRespuesta(TurnoBase):
     id_turno: int
+    estado: EstadoTurno
+
+# --- ESQUEMA DEL CONTRATO HTTP (Recibe el JSON de React) ---
+class TurnoPeticion(BaseModel):
+    id_mascota: int
+    id_veterinario: int
+    fecha_hora: datetime
+    motivo: str | None = None
+    
+class TurnoEstadoActualizar(BaseModel):
     estado: EstadoTurno

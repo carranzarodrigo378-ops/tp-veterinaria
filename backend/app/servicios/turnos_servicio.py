@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from app.esquemas.turnos import TurnoCrear
 from app.persistencia.turnos_dao import TurnoDAO
 
-
 class TurnosServicio:
     def __init__(self, turno_dao: TurnoDAO = None):
         self.turno_dao = turno_dao or TurnoDAO()
@@ -25,6 +24,5 @@ class TurnosServicio:
 
     def listar_turnos(self) -> list[dict]:
         return self.turno_dao.obtener_todos(limite=500)
-
 
 servicio_turnos = TurnosServicio()

@@ -30,7 +30,7 @@ const TurnosPage = () => {
     if (!clientId) return;
 
     try {
-      const res = await api.get(`/api/mascotas/cliente/${clientId}`);
+      const res = await api.get(`/api/clinica/clientes/${clientId}/mascotas?incluir_inactivos=false`);
       const lista = res.data || [];
       setMisMascotas(lista);
 
@@ -38,7 +38,7 @@ const TurnosPage = () => {
       if (location.state?.nuevaMascotaId) {
         setFormData((prev) => ({ ...prev, mascotaId: String(location.state.nuevaMascotaId) }));
       } else if (lista.length > 0 && !formData.mascotaId) {
-        setFormData((prev) => ({ ...prev, mascotaId: String(lista[0].id) }));
+        setFormData((prev) => ({ ...prev, mascotaId: String(lista[0].id_mascota) }));
       }
     } catch (err) {
       console.error('Error al cargar mascotas:', err);
@@ -52,8 +52,7 @@ const TurnosPage = () => {
   const handleMascotaChange = (e) => {
     const value = e.target.value;
     if (value === 'IR_A_REGISTRO') {
-      // Redirige a PetsPage manteniendo la sesión activa y pasando la señal de retorno
-      navigate('/pets', { state: { returnToTurnos: true } });
+      navigate('/mascotas', { state: { returnToTurnos: true } });
     } else {
       setFormData({ ...formData, mascotaId: value });
     }
@@ -71,14 +70,18 @@ const TurnosPage = () => {
     setError('');
 
     try {
-      const clientId = localStorage.getItem('clientId');
-      await api.post('/api/turnos', {
-        id_cliente: clientId ? parseInt(clientId, 10) : null,
+      // Unimos fecha y hora en formato ISO 8601 (FastAPI/Pydantic lo convierte a datetime solo)
+      const fechaHoraCombinada = `${formData.fecha}T${formData.hora}:00`;
+
+      // Determinamos el veterinario según la hora. 
+      // Antes de las 15:00 = Vet 1, a partir de las 15:00 = Vet 2
+      const idAsignado = formData.hora < "15:00" ? 1 : 2;
+
+      await api.post('/api/clinica/turnos', {
         id_mascota: parseInt(formData.mascotaId, 10),
-        servicio: formData.servicio,
-        fecha: formData.fecha,
-        hora: formData.hora,
-        motivo: formData.motivo,
+        id_veterinario: idAsignado, 
+        fecha_hora: fechaHoraCombinada,
+        motivo: formData.motivo
       });
 
       setSubmitted(true);
@@ -91,12 +94,11 @@ const TurnosPage = () => {
   };
 
   const mascotaSeleccionada =
-    misMascotas.find((m) => String(m.id) === String(formData.mascotaId))?.nombre || 'Mascota';
+    misMascotas.find((m) => String(m.id_mascota) === String(formData.mascotaId))?.nombre || 'Mascota';
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
 
-      {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
@@ -104,7 +106,6 @@ const TurnosPage = () => {
 
       <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white flex flex-col justify-between overflow-y-auto">
         <div>
-          {/* Top Bar */}
           <div className="flex justify-between items-center mb-4">
             <button
               onClick={() => navigate('/home')}
@@ -123,7 +124,6 @@ const TurnosPage = () => {
           )}
 
           {submitted ? (
-            /* Confirmación */
             <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-lg text-center mt-6 space-y-4">
               <span className="text-5xl">🎉</span>
               <h3 className="text-[#129b9b] text-xl font-bold">¡Cita Programada!</h3>
@@ -136,6 +136,7 @@ const TurnosPage = () => {
                 <p><strong>Fecha:</strong> {formData.fecha}</p>
                 <p><strong>Hora:</strong> {formData.hora} hs</p>
                 {formData.motivo && <p><strong>Motivo:</strong> {formData.motivo}</p>}
+                <p><strong>Veterinario asignado:</strong> Vet {formData.hora < "15:00" ? 1 : 2}</p>
               </div>
 
               <button
@@ -147,7 +148,6 @@ const TurnosPage = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Selector de Mascota */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-cyan-100">
                   Seleccionar Mascota
@@ -161,7 +161,7 @@ const TurnosPage = () => {
                     <option value="" disabled>-- No tenés mascotas registradas --</option>
                   )}
                   {misMascotas.map((m) => (
-                    <option key={m.id} value={m.id}>
+                    <option key={m.id_mascota} value={m.id_mascota}>
                       🐾 {m.nombre} ({m.especie})
                     </option>
                   ))}
@@ -171,7 +171,6 @@ const TurnosPage = () => {
                 </select>
               </div>
 
-              {/* Tipo de Servicio */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-cyan-100">Tipo de Servicio</label>
                 <select
@@ -186,7 +185,6 @@ const TurnosPage = () => {
                 </select>
               </div>
 
-              {/* Fecha y Hora */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-cyan-100">Fecha</label>
@@ -214,7 +212,6 @@ const TurnosPage = () => {
                 </div>
               </div>
 
-              {/* Motivo */}
               <div>
                 <label className="block text-xs font-semibold mb-1 text-cyan-100">Motivo de la visita</label>
                 <textarea
