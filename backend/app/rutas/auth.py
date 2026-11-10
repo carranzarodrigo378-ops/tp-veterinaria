@@ -64,6 +64,8 @@ def login(formulario: OAuth2PasswordRequestForm = Depends()):
         "token_type": "bearer",
         "usuario": formulario.username,
         "rol": usuario_info["rol"],
+        "id_cliente": usuario_info["id_cliente"],          # nuevo
+        "id_veterinario": usuario_info["id_veterinario"],
     }
 
 
@@ -83,6 +85,8 @@ def login_json(credenciales: LoginJsonEsquema):
         "token_type": "bearer",
         "usuario": credenciales.usuario,
         "rol": usuario_info["rol"],
+        "id_cliente": usuario_info["id_cliente"],
+        "id_veterinario": usuario_info["id_veterinario"],
     }
 
 

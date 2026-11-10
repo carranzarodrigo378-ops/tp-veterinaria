@@ -79,7 +79,7 @@ const HomeMenu = () => {
         id: 'mascotas-cliente',
         tag: 'Pacientes',
         title: 'Mis Mascotas',
-        description: 'Fichas clínicas, esquemas de vacunas y fechas programadas',
+        description: '',
         icon: icons.petCard,
         path: '/mascotas',
       },
