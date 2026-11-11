@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
 
-// Colores del estado del turno (ajustá las claves a los estados reales del backend)
+// Colores del estado del turno
 const colorEstado = (estado = '') => {
   const e = String(estado).toLowerCase();
   if (e.includes('cancel')) return 'bg-red-100 text-red-700';
@@ -12,11 +12,9 @@ const colorEstado = (estado = '') => {
   return 'bg-yellow-100 text-yellow-700';
 };
 
-// fecha_hora_inicio llega como "2026-11-11 14:30:00"
-const soloFecha = (dt = '') => String(dt).slice(0, 10); // 2026-11-11
-const soloHora = (dt = '') => String(dt).slice(11, 16); // 14:30
-
-// Fecha local en YYYY-MM-DD (toISOString usaría UTC y a la noche daría el día siguiente)
+// Formateo de fechas y horas
+const soloFecha = (dt = '') => String(dt).slice(0, 10);
+const soloHora = (dt = '') => String(dt).slice(11, 16);
 const hoyISO = () => new Date().toLocaleDateString('en-CA');
 
 const AgendaVeterinarioPage = () => {
@@ -40,24 +38,27 @@ const AgendaVeterinarioPage = () => {
     if (!sesionValida) navigate('/login');
   }, [sesionValida, navigate]);
 
-  // Obtener los turnos desde el backend
+  // Obtener los turnos desde el endpoint del backend pasando la fecha seleccionada
   const obtenerTurnos = useCallback(async () => {
     try {
       setCargando(true);
       setError('');
 
-      const res = await api.get('/api/clinica/turnos');
+      const res = await api.get('/api/clinica/turnos/agenda', {
+        params: { fecha },
+      });
       let lista = Array.isArray(res.data) ? res.data : [];
 
-      // Solo los turnos del veterinario logueado
+      // Filtro opcional por veterinario si el usuario lo tiene en su storage
       const idVeterinario = localStorage.getItem('veterinarioId');
       if (idVeterinario) {
         lista = lista.filter(
-          (t) => String(t.veterinario_id) === String(idVeterinario)
+          (t) =>
+            String(t.veterinario_id ?? t.id_veterinario) === String(idVeterinario)
         );
       }
 
-      // Orden cronológico (el formato YYYY-MM-DD HH:MM:SS se ordena bien como texto)
+      // Orden cronológico
       lista.sort((a, b) =>
         String(a.fecha_hora_inicio).localeCompare(String(b.fecha_hora_inicio))
       );
@@ -69,8 +70,9 @@ const AgendaVeterinarioPage = () => {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [fecha]);
 
+  // Vuelve a consultar la API al cargar o al cambiar de día
   useEffect(() => {
     if (sesionValida) obtenerTurnos();
   }, [sesionValida, obtenerTurnos]);
@@ -90,7 +92,6 @@ const AgendaVeterinarioPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
-
       {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
@@ -98,7 +99,6 @@ const AgendaVeterinarioPage = () => {
       />
 
       <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white overflow-y-auto">
-
         {/* Barra superior */}
         <div className="flex justify-between items-center mb-4">
           <button
@@ -122,7 +122,7 @@ const AgendaVeterinarioPage = () => {
               type="date"
               value={fecha}
               onChange={(e) => e.target.value && setFecha(e.target.value)}
-              className="bg-transparent text-center font-semibold text-sm outline-none"
+              className="bg-transparent text-center font-semibold text-sm outline-none cursor-pointer"
             />
             {fecha !== hoyISO() && (
               <button
@@ -170,9 +170,9 @@ const AgendaVeterinarioPage = () => {
                 turnosDelDia.map((t, i) => (
                   <div
                     key={t.id_turno ?? i}
-                    className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-1"
+                    className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-1.5"
                   >
-                    <div className="flex justify-between items-center border-b pb-1">
+                    <div className="flex justify-between items-center border-b pb-1.5">
                       <span className="font-bold text-[#129b9b] text-sm">
                         {soloHora(t.fecha_hora_inicio)} - {soloHora(t.fecha_hora_fin)} hs
                       </span>
@@ -185,14 +185,22 @@ const AgendaVeterinarioPage = () => {
                       )}
                     </div>
 
+                    {/* Mascota */}
                     <p className="pt-1">
-                      <strong>Mascota:</strong>{' '}
-                      {t.nombre_mascota ?? `N° ${t.mascota_id ?? '-'}`}
+                      <strong className="text-gray-900">Mascota:</strong>{' '}
+                      {t.nombre_mascota || (t.id_mascota ?? t.mascota_id ? `N° ${t.id_mascota ?? t.mascota_id}` : 'No especificada')}
                     </p>
 
-                    {t.nombre_cliente && (
-                      <p>
-                        <strong>Cliente:</strong> {t.nombre_cliente}
+                    {/* Dueño / Cliente */}
+                    <p>
+                      <strong className="text-gray-900">Dueño:</strong>{' '}
+                      {t.nombre_cliente || t.nombre_dueno || t.cliente || 'No asignado'}
+                    </p>
+
+                    {/* Motivo o Servicio (opcional si viene en el JSON) */}
+                    {(t.motivo || t.servicio) && (
+                      <p className="text-gray-500 text-[11px]">
+                        <strong>Detalle:</strong> {t.servicio || t.motivo}
                       </p>
                     )}
                   </div>
