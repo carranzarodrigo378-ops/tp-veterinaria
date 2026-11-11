@@ -6,7 +6,7 @@ class TurnosServicio:
     def __init__(self, turno_dao: TurnoDAO = None):
         self.turno_dao = turno_dao or TurnoDAO()
 
-    def agendar_turno(self, id_veterinario: int, id_mascota: int, fecha_hora: datetime, duracion_minutos: int = 30):
+    def agendar_turno(self, id_veterinario: int, id_mascota: int, fecha_hora: datetime, motivo: str = None, servicio: str = None, duracion_minutos: int = 30):
         inicio_nuevo = fecha_hora
         fin_nuevo = inicio_nuevo + timedelta(minutes=duracion_minutos)
 
@@ -16,9 +16,10 @@ class TurnosServicio:
             veterinario_id=id_veterinario,
             mascota_id=id_mascota,
             estado="programado",
+            motivo=motivo,
+            servicio=servicio
         )
 
-        # TurnoDAO ejecuta _hay_superposicion e inserta transaccionalmente
         id_turno = self.turno_dao.crear(turno_dto)
         return self.turno_dao.obtener_por_id(id_turno)
 

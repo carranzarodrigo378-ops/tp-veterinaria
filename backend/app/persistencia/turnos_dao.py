@@ -43,6 +43,8 @@ class TurnoDAO(BaseDAO):
                 "veterinario_id": turno.veterinario_id,
                 "mascota_id": turno.mascota_id,
                 "estado": EstadoTurno.programado.value,
+                "motivo": turno.motivo,
+                "servicio": turno.servicio,
             })
 
     def actualizar(self, id_turno: int, datos: TurnoActualizar) -> bool:

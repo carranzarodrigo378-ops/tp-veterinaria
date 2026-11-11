@@ -81,7 +81,8 @@ const TurnosPage = () => {
         id_mascota: parseInt(formData.mascotaId, 10),
         id_veterinario: idAsignado, 
         fecha_hora: fechaHoraCombinada,
-        motivo: formData.motivo
+        motivo: formData.motivo,
+        servicio: formData.servicio 
       });
 
       setSubmitted(true);
