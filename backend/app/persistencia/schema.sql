@@ -54,7 +54,6 @@ CREATE TABLE IF NOT EXISTS historias_clinicas (
 );
 
 -- ==================== ATENCIÓN ====================
-
 CREATE TABLE IF NOT EXISTS turnos (
     id_turno          INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha_hora_inicio DATETIME NOT NULL,
@@ -62,6 +61,8 @@ CREATE TABLE IF NOT EXISTS turnos (
     veterinario_id    INTEGER NOT NULL,
     mascota_id        INTEGER NOT NULL,
     estado            TEXT NOT NULL CHECK (estado IN ('programado', 'atendido', 'cancelado')),
+    motivo            TEXT,
+    servicio          TEXT,
     FOREIGN KEY (mascota_id) REFERENCES mascotas (id_mascota),
     FOREIGN KEY (veterinario_id) REFERENCES veterinarios (id_veterinario)
 );

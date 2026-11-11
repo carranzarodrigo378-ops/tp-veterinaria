@@ -7,6 +7,8 @@ class TurnoBase(BaseModel):
     fecha_hora_fin: datetime
     veterinario_id: int
     mascota_id: int
+    motivo: str | None = None
+    servicio: str | None = None
 
     @model_validator(mode="after")
     def validar_rango(self):
@@ -15,7 +17,7 @@ class TurnoBase(BaseModel):
         return self
 
 class TurnoCrear(TurnoBase):
-    pass  # el estado inicial lo fija el sistema: programado
+    pass
 
 class TurnoActualizar(BaseModel):
     fecha_hora_inicio: datetime | None = None
@@ -26,12 +28,12 @@ class TurnoRespuesta(TurnoBase):
     id_turno: int
     estado: EstadoTurno
 
-# --- ESQUEMA DEL CONTRATO HTTP (Recibe el JSON de React) ---
 class TurnoPeticion(BaseModel):
     id_mascota: int
     id_veterinario: int
     fecha_hora: datetime
     motivo: str | None = None
-    
+    servicio: str | None = None
+
 class TurnoEstadoActualizar(BaseModel):
     estado: EstadoTurno

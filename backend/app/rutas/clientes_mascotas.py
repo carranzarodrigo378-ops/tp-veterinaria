@@ -162,15 +162,14 @@ def programar_turno(
     datos: TurnoPeticion,
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
-    """
-    Registra un nuevo turno. Toda la lógica y control de superposición 
-    es manejada por el servicio_turnos y TurnoDAO.
-    """
     try:
+        # Acá le agregamos motivo=datos.motivo y servicio=datos.servicio
         turno_creado = servicio_turnos.agendar_turno(
             id_veterinario=datos.id_veterinario,
             id_mascota=datos.id_mascota,
-            fecha_hora=datos.fecha_hora
+            fecha_hora=datos.fecha_hora,
+            motivo=datos.motivo,
+            servicio=datos.servicio
         )
         return turno_creado
     except ValueError as e:
