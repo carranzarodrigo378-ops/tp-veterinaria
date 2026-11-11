@@ -91,7 +91,7 @@ const HomeMenu = () => {
         title: 'Atención Clínica',
         description: 'Consultas agendadas hoy, diagnósticos y recetas digitales',
         icon: icons.stethoscope,
-        path: '/turnos',
+        path: '/agenda',
       },
       {
         id: 'pacientes-vete',
