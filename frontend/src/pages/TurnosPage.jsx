@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axiosConfig';
 
+// Calcula la fecha mínima requerida (hoy + 2 días) en formato YYYY-MM-DD
+const calcularFechaMinima = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  return d.toLocaleDateString('en-CA');
+};
+
 const TurnosPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -10,8 +17,8 @@ const TurnosPage = () => {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
 
-  // Fecha actual en formato YYYY-MM-DD para bloquear días pasados
-  const today = new Date().toISOString().split('T')[0];
+  // Fecha mínima permitida (2 días de anticipación)
+  const minDate = calcularFechaMinima();
 
   // Lista dinámicamente obtenida desde el Backend
   const [misMascotas, setMisMascotas] = useState([]);
@@ -19,7 +26,7 @@ const TurnosPage = () => {
   const [formData, setFormData] = useState({
     mascotaId: '',
     servicio: 'Consulta General',
-    fecha: today,
+    fecha: minDate,
     hora: '09:00',
     motivo: '',
   });
@@ -66,23 +73,28 @@ const TurnosPage = () => {
       return;
     }
 
+    // Validación de anticipación mínima de 2 días
+    if (formData.fecha < minDate) {
+      setError('Los turnos deben solicitarse con al menos 2 días de anticipación.');
+      return;
+    }
+
     setCargando(true);
     setError('');
 
     try {
-      // Unimos fecha y hora en formato ISO 8601 (FastAPI/Pydantic lo convierte a datetime solo)
+      // Unimos fecha y hora en formato ISO 8601
       const fechaHoraCombinada = `${formData.fecha}T${formData.hora}:00`;
 
-      // Determinamos el veterinario según la hora. 
-      // Antes de las 15:00 = Vet 1, a partir de las 15:00 = Vet 2
-      const idAsignado = formData.hora < "15:00" ? 1 : 2;
+      // Determinamos el veterinario según la hora: antes de 15:00 = Vet 1, desde 15:00 = Vet 2
+      const idAsignado = formData.hora < '15:00' ? 1 : 2;
 
       await api.post('/api/clinica/turnos', {
         id_mascota: parseInt(formData.mascotaId, 10),
-        id_veterinario: idAsignado, 
+        id_veterinario: idAsignado,
         fecha_hora: fechaHoraCombinada,
         motivo: formData.motivo,
-        servicio: formData.servicio 
+        servicio: formData.servicio,
       });
 
       setSubmitted(true);
@@ -99,7 +111,6 @@ const TurnosPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
-
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
@@ -137,7 +148,7 @@ const TurnosPage = () => {
                 <p><strong>Fecha:</strong> {formData.fecha}</p>
                 <p><strong>Hora:</strong> {formData.hora} hs</p>
                 {formData.motivo && <p><strong>Motivo:</strong> {formData.motivo}</p>}
-                <p><strong>Veterinario asignado:</strong> Vet {formData.hora < "15:00" ? 1 : 2}</p>
+                <p><strong>Veterinario asignado:</strong> Vet {formData.hora < '15:00' ? 1 : 2}</p>
               </div>
 
               <button
@@ -192,10 +203,10 @@ const TurnosPage = () => {
                   <input
                     type="date"
                     required
-                    min={today}
+                    min={minDate}
                     value={formData.fecha}
                     onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                    className="w-full bg-white text-gray-800 rounded-xl p-3 text-xs font-medium focus:outline-none border-0"
+                    className="w-full bg-white text-gray-800 rounded-xl p-3 text-xs font-medium focus:outline-none border-0 cursor-pointer"
                   />
                 </div>
 

@@ -203,3 +203,39 @@ def cambiar_estado_turno(
         "id_turno": id_turno,
         "estado": datos.estado.value,
     }
+@router.get("/turnos/agenda")
+def obtener_agenda(
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    try:
+        # 1. Si usuario_actual ya tiene el id_veterinario, llamamos directo al DAO
+        id_vet = usuario_actual.get("id_veterinario") or usuario_actual.get("veterinario_id")
+        if id_vet:
+            return servicio_turnos.turno_dao.obtener_agenda_veterinario(id_vet)
+
+        # 2. Si no viene el id_vet directo, buscamos el nombre de usuario
+        nombre_usuario = (
+            usuario_actual.get("usuario")
+            or usuario_actual.get("sub")
+            or usuario_actual.get("username")
+            or usuario_actual.get("nombre_usuario")
+        )
+
+        if not nombre_usuario:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"No se pudo identificar el usuario en la sesión: {usuario_actual}"
+            )
+
+        return servicio_turnos.obtener_agenda_veterinario(nombre_usuario=nombre_usuario)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener la agenda: {str(e)}",
+        )

@@ -123,6 +123,24 @@ class TurnoDAO(BaseDAO):
         )
         return [dict(f) for f in cursor.fetchall()]
 
+    def obtener_agenda_veterinario(self, veterinario_id: int) -> list[dict]:
+        """Agenda completa del veterinario con nombre de mascota y cliente."""
+        cursor = self.db.get_conexion().execute(
+            """
+            SELECT 
+                t.*,
+                COALESCE(m.nombre, 'Sin nombre') AS nombre_mascota,
+                COALESCE(c.nombre || ' ' || c.apellido, 'Sin dueño asignado') AS nombre_cliente
+            FROM turnos t
+            LEFT JOIN mascotas m ON m.id_mascota = t.mascota_id
+            LEFT JOIN clientes c ON c.id_cliente = m.id_cliente
+            WHERE t.veterinario_id = ?
+            ORDER BY t.fecha_hora_inicio ASC
+            """,
+            (veterinario_id,),
+        )
+        return [dict(f) for f in cursor.fetchall()]
+
     def pertenece_a_cliente(self, id_turno: int, id_cliente: int) -> bool:
         cursor = self.db.get_conexion().execute(
             """
