@@ -119,14 +119,21 @@ const TurnosPage = () => {
       <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white flex flex-col justify-between overflow-y-auto">
         <div>
           <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={() => navigate('/home')}
-              className="text-sm font-semibold flex items-center gap-1 hover:underline cursor-pointer"
-            >
-              ‹ Volver
-            </button>
-            <h2 className="font-bold text-lg">Pedir Cita</h2>
-            <div className="w-6"></div>
+            {/* Solo muestra el botón Volver arriba si el turno AÚN NO fue confirmado */}
+            {!submitted ? (
+              <button
+                onClick={() => navigate('/home')}
+                className="text-sm font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+              >
+                ‹ Volver
+              </button>
+            ) : (
+              <div className="w-12"></div>
+            )}
+            <h2 className="font-bold text-lg">
+              {submitted ? 'Turno Solicitado' : 'Pedir Cita'}
+            </h2>
+            <div className="w-12"></div>
           </div>
 
           {error && (
@@ -151,12 +158,21 @@ const TurnosPage = () => {
                 <p><strong>Veterinario asignado:</strong> Vet {formData.hora < '15:00' ? 1 : 2}</p>
               </div>
 
-              <button
-                onClick={() => setSubmitted(false)}
-                className="w-full bg-[#129b9b] text-white py-2.5 rounded-full font-bold text-xs hover:bg-[#0e7e7e] transition-colors cursor-pointer"
-              >
-                Solicitar otro turno
-              </button>
+              <div className="space-y-2.5 pt-1">
+                <button
+                  onClick={() => setSubmitted(false)}
+                  className="w-full bg-[#129b9b] text-white py-2.5 rounded-full font-bold text-xs hover:bg-[#0e7e7e] transition-colors cursor-pointer"
+                >
+                  Solicitar otro turno
+                </button>
+
+                <button
+                  onClick={() => navigate('/home')}
+                  className="w-full bg-gray-100 text-[#129b9b] border border-[#129b9b]/30 py-2.5 rounded-full font-bold text-xs hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  Volver a menú principal
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">

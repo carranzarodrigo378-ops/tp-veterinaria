@@ -22,22 +22,34 @@ api.interceptors.request.use(
 // Interceptor de respuesta:
 // 1) guarda en silencio el token renovado que manda el backend
 // 2) maneja tokens vencidos o errores 401
+
+// Interceptor de respuesta
 api.interceptors.response.use(
   (response) => {
     const nuevoToken = response.headers['x-renewed-token'];
+
     if (nuevoToken) {
       localStorage.setItem('token', nuevoToken);
     }
+
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Si el token expiró, limpiamos y redirigimos al login
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    if (error.response?.status === 401) {
+
+      // Identificamos si el error proviene del inicio de sesión
+      const esLogin = error.config?.url?.includes('/api/auth/login-json');
+
+      // Si es un error de login, NO cerramos la sesión ni redirigimos
+      if (!esLogin) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
     }
+
     return Promise.reject(error);
   }
 );
+
 
 export default api;
