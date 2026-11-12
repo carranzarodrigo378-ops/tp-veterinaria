@@ -104,7 +104,7 @@ const HomeMenu = () => {
       {
         id: 'laboratorio-vete',
         tag: 'Diagnóstico',
-        title: 'Laboratorio Hub',
+        title: 'Muestras biológicas',
         description: 'Ingreso de muestras biológicas y seguimiento de análisis',
         icon: icons.lab,
         path: '/laboratorio-hub',
@@ -148,7 +148,7 @@ const HomeMenu = () => {
       {
         id: 'lab-admin',
         tag: 'Servicios',
-        title: 'Laboratorio Hub',
+        title: 'MUestras biológicas',
         description: 'Monitoreo de órdenes, derivaciones y entregas de resultados',
         icon: icons.lab,
         path: '/laboratorio-hub',
