@@ -44,14 +44,15 @@ const Login = () => {
     }
   };
 
-  // CAMBIO: recibe userId y lo guarda como clientId (solo si existe)
+  // Guarda la sesión y redirige a '/laboratorio' si el rol es laboratorio, o a '/home' para el resto
   const guardarSesion = (token, role, userName, userId) => {
     const ahora = Date.now();
     const tiempoExpiracion = ahora + 10 * 60 * 1000;
+    const rolNormalizado = String(role || '').toLowerCase();
 
     localStorage.setItem('token', token);
     localStorage.setItem('token_expiration', tiempoExpiracion);
-    localStorage.setItem('role', role);
+    localStorage.setItem('role', rolNormalizado);
     localStorage.setItem('clientName', userName);
 
     if (userId != null) {
@@ -60,7 +61,11 @@ const Login = () => {
       localStorage.removeItem('clientId');
     }
 
-    navigate('/home');
+    if (rolNormalizado === 'laboratorio') {
+      navigate('/laboratorio', { replace: true });
+    } else {
+      navigate('/home', { replace: true });
+    }
   };
 
   // 1. Login para Clientes
@@ -75,7 +80,6 @@ const Login = () => {
         password: loginPassword,
       });
 
-      // CAMBIO: se extrae id_cliente y se pasa a guardarSesion
       const { access_token, rol, usuario, id_cliente } = res.data;
       guardarSesion(access_token, rol, usuario, id_cliente);
     } catch (err) {
@@ -86,7 +90,7 @@ const Login = () => {
     }
   };
 
-  // 2. Login para Veterinarios
+  // 2. Login para Veterinarios / Admin / Laboratorio
   const handleLoginVeterinario = async (e) => {
     e.preventDefault();
     setErrorMensaje(null);
@@ -98,12 +102,11 @@ const Login = () => {
         password: vetPassword,
       });
 
-      // CAMBIO: se extrae id_cliente y se pasa a guardarSesion
       const { access_token, rol, usuario, id_cliente } = res.data;
       guardarSesion(access_token, rol, usuario, id_cliente);
     } catch (err) {
       console.error(err);
-      setErrorMensaje(err.response?.data?.detail || 'Credenciales de veterinario inválidas');
+      setErrorMensaje(err.response?.data?.detail || 'Credenciales inválidas');
     } finally {
       setCargando(false);
     }
@@ -141,7 +144,6 @@ const Login = () => {
         password: regPassword,
       });
 
-      // CAMBIO: se pasa también id_cliente
       guardarSesion(
         resLogin.data.access_token,
         resLogin.data.rol,
@@ -229,7 +231,7 @@ const Login = () => {
             }}
             className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95 cursor-pointer"
           >
-            INGRESAR COMO VETERINARIO
+            INGRESAR COMO VETERINARIO / LAB
           </button>
         </div>
 
@@ -246,7 +248,7 @@ const Login = () => {
 
               <h3 className="font-bold text-[#129b9b] text-center text-base">
                 {modalTipo === 'veterinario'
-                  ? 'Acceso Veterinario'
+                  ? 'Acceso Profesional / Laboratorio'
                   : (activeTabCliente === 'login' ? 'Acceso Cliente' : 'Crear Cuenta Cliente')}
               </h3>
 
@@ -257,13 +259,13 @@ const Login = () => {
                 </div>
               )}
 
-              {/* FLUJO VETERINARIO */}
+              {/* FLUJO VETERINARIO / LABORATORIO */}
               {modalTipo === 'veterinario' && (
                 <form onSubmit={handleLoginVeterinario} className="space-y-3 text-xs">
                   <div className="space-y-2">
                     <input
                       type="text"
-                      placeholder="Usuario veterinario (ej: vet_franco) *"
+                      placeholder="Usuario (ej: vet_franco o lab_central) *"
                       required
                       value={vetUsuario}
                       onChange={(e) => setVetUsuario(e.target.value)}
@@ -408,18 +410,19 @@ const Login = () => {
                           inputMode="tel"
                           placeholder="Teléfono (opcional)"
                           value={regTelefono}
-                          onChange={(e) => {const valorValido = e.target.value.replace(/[^0-9+]/g, '');
-                          setRegTelefono(valorValido);
+                          onChange={(e) => {
+                            const valorValido = e.target.value.replace(/[^0-9+]/g, '');
+                            setRegTelefono(valorValido);
                           }}
                           className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                         <input
                           type="text"
-                          placeholder="DNI  "
+                          placeholder="DNI *"
                           required
                           maxLength={10}
                           value={regDni}
-                          onChange={(e) => setRegDni(e.target.value.replace(/\D/g, ''))} // Solo números
+                          onChange={(e) => setRegDni(e.target.value.replace(/\D/g, ''))}
                           className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                       </div>

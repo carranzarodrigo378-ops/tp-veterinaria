@@ -2,12 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosConfig';
 
-// El backend guarda los estados en minúscula con guión bajo
 const ESTADOS = {
-  extraida: { texto: 'Extraída', clase: 'bg-amber-100 text-amber-800' },
-  empaquetada: { texto: 'Empaquetada', clase: 'bg-amber-100 text-amber-800' },
-  en_transito: { texto: 'En Tránsito', clase: 'bg-amber-100 text-amber-800' },
-  recibida: { texto: 'Recibida', clase: 'bg-blue-100 text-blue-700' },
+  extraida: { texto: 'Extraída (Sin empaquetar)', clase: 'bg-slate-100 text-slate-700' },
+  empaquetada: { texto: 'Empaquetada (Lista p/ enviar)', clase: 'bg-amber-100 text-amber-800' },
+  en_transito: { texto: 'En Tránsito al Lab', clase: 'bg-amber-100 text-amber-800' },
+  recibida: { texto: 'Recibida en Lab', clase: 'bg-blue-100 text-blue-700' },
   analizada: { texto: 'Analizada', clase: 'bg-green-100 text-green-700' },
   rechazada: { texto: 'Muestra Rechazada', clase: 'bg-red-100 text-red-700' },
 };
@@ -15,44 +14,52 @@ const ESTADOS = {
 const infoEstado = (estado) =>
   ESTADOS[estado] ?? { texto: estado, clase: 'bg-gray-100 text-gray-700' };
 
-// "2026-11-12 08:55:03" -> "12/11/2026"
 const fechaCorta = (dt = '') => {
   const [y, m, d] = String(dt).slice(0, 10).split('-');
   return d ? `${d}/${m}/${y}` : '';
 };
 
-// Evita que un dato con caracteres HTML rompa el informe imprimible
 const esc = (v) =>
-  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  String(v ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+  );
 
-const MuestrasPage = () => {
+const LaboratorioPage = () => {
   const navigate = useNavigate();
-  const role = localStorage.getItem('role') || 'cliente';
+  const role = (localStorage.getItem('role') || localStorage.getItem('rol') || 'cliente').toLowerCase();
+  const token = localStorage.getItem('token') || localStorage.getItem('access_token');
 
   const [muestras, setMuestras] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [procesando, setProcesando] = useState(null); // id de la muestra en proceso
-  const [resultados, setResultados] = useState({}); // texto del resultado por id_muestra
+  const [procesando, setProcesando] = useState(null);
+  const [transportistas, setTransportistas] = useState({});
+  const [trazabilidadAbierta, setTrazabilidadAbierta] = useState({});
   const [searchMode, setSearchMode] = useState('listado');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Sesión válida y rol correcto
+  // Si por error un usuario 'laboratorio' entra a /muestras, lo mandamos a su pantalla /laboratorio
+  useEffect(() => {
+    if (role === 'laboratorio') {
+      navigate('/laboratorio', { replace: true });
+    }
+  }, [role, navigate]);
+
   const expiration = localStorage.getItem('token_expiration');
   const sesionValida =
-    !!expiration &&
-    Date.now() <= parseInt(expiration, 10) &&
+    !!token &&
+    (!expiration || Date.now() <= parseInt(expiration, 10)) &&
     ['veterinario', 'admin'].includes(role);
 
   useEffect(() => {
-    if (!sesionValida) navigate('/login');
-  }, [sesionValida, navigate]);
+    if (!sesionValida && role !== 'laboratorio') navigate('/login');
+  }, [sesionValida, role, navigate]);
 
   const cargarMuestras = useCallback(async () => {
     try {
       setCargando(true);
       setError('');
-      // La barra final es necesaria: sin ella FastAPI redirige y se pierde el token
       const res = await api.get('/api/muestras/');
       setMuestras(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
@@ -67,8 +74,7 @@ const MuestrasPage = () => {
     if (sesionValida) cargarMuestras();
   }, [sesionValida, cargarMuestras]);
 
-  // Ejecuta una acción sobre una muestra y recarga la lista
-  const ejecutarAccion = async (idMuestra, accion, cuerpo) => {
+  const ejecutarAccion = async (idMuestra, accion, cuerpo = {}) => {
     try {
       setProcesando(idMuestra);
       setError('');
@@ -82,25 +88,31 @@ const MuestrasPage = () => {
     }
   };
 
-  const recibir = (id, precintoIntacto) =>
-    ejecutarAccion(id, 'recibir', { estado_precinto: precintoIntacto ? 'intacto' : 'roto' });
+  // 1. Empaquetar muestra en conservadora (genera Remito Biológico y Precinto Sanitario)
+  const empaquetar = (id) => ejecutarAccion(id, 'empaquetar', {});
 
-  const finalizarAnalisis = (id) => {
-    const texto = (resultados[id] || '').trim();
-    if (!texto) {
-      setError('Escribí el resultado del análisis antes de finalizar.');
-      return;
-    }
-    ejecutarAccion(id, 'analizar', { resultado: texto });
+  // 2. Despachar al Laboratorio Central (pasa la pelota a LaboratorioOnly.jsx)
+  const despachar = (id) => {
+    const responsable = (transportistas[id] || 'Transporte Sanitario Vet2Gö').trim();
+    ejecutarAccion(id, 'despachar', { responsable_transporte: responsable });
+  };
+
+  const toggleTrazabilidad = (id) => {
+    setTrazabilidadAbierta((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const muestrasFiltradas = muestras.filter((m) => {
     if (searchMode === 'codigo') {
       if (!searchTerm.trim()) return false;
       const term = searchTerm.toLowerCase().trim();
-      return [m.codigo, m.nro_remito, m.paciente, m.nombre_cliente, String(m.id_cliente ?? '')].some(
-        (campo) => campo?.toLowerCase().includes(term)
-      );
+      return [
+        m.codigo,
+        m.nro_remito,
+        m.nro_precinto,
+        m.paciente,
+        m.nombre_cliente,
+        String(m.id_cliente ?? ''),
+      ].some((campo) => campo?.toLowerCase().includes(term));
     }
     return true;
   });
@@ -108,6 +120,10 @@ const MuestrasPage = () => {
   const handleDescargarPDF = (m) => {
     const ventana = window.open('', '_blank');
     if (!ventana) return;
+    const itemsHistorial = Array.isArray(m.historial_trazabilidad)
+      ? m.historial_trazabilidad.map((h) => `<li>${esc(h)}</li>`).join('')
+      : '';
+
     ventana.document.write(`
       <html>
         <head>
@@ -118,6 +134,7 @@ const MuestrasPage = () => {
             .title { color: #129b9b; margin: 0; }
             .box { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
             .footer { margin-top: 30px; font-size: 11px; text-align: center; color: #777; }
+            ul { font-size: 12px; padding-left: 18px; color: #444; }
           </style>
         </head>
         <body>
@@ -128,7 +145,9 @@ const MuestrasPage = () => {
           <div class="box">
             <p><strong>Código de muestra:</strong> ${esc(m.codigo)}</p>
             <p><strong>Nº Remito:</strong> ${esc(m.nro_remito || '-')}</p>
-            <p><strong>Precinto:</strong> ${esc(m.nro_precinto || '-')} ${m.estado_precinto ? `(${esc(m.estado_precinto)})` : ''}</p>
+            <p><strong>Precinto:</strong> ${esc(m.nro_precinto || '-')} ${
+              m.estado_precinto ? `(${esc(m.estado_precinto)})` : ''
+            }</p>
             <p><strong>Cliente:</strong> ${esc(m.nombre_cliente)}</p>
             <p><strong>Paciente:</strong> ${esc(m.paciente)}</p>
             <p><strong>Clínica origen:</strong> ${esc(m.clinica_origen)}</p>
@@ -139,6 +158,14 @@ const MuestrasPage = () => {
             <p><strong>Estado:</strong> ${esc(infoEstado(m.estado_actual).texto)}</p>
             <p><strong>Informe Diagnóstico:</strong> ${esc(m.resultado || 'Pendiente')}</p>
           </div>
+          ${
+            itemsHistorial
+              ? `<div class="box">
+                  <h3>Cadena de Custodia Inmutable:</h3>
+                  <ul>${itemsHistorial}</ul>
+                </div>`
+              : ''
+          }
           <div class="footer">
             <p>Documento oficial emitido con cadena de custodia inmutable.</p>
           </div>
@@ -153,7 +180,6 @@ const MuestrasPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
-      {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
@@ -168,7 +194,12 @@ const MuestrasPage = () => {
           >
             ‹ Volver
           </button>
-          <h2 className="font-bold text-lg">Muestras Biológicas</h2>
+          <div className="text-center">
+            <h2 className="font-bold text-lg leading-tight">Envío y Seguimiento</h2>
+            <span className="text-[10px] text-white/80 font-medium">
+              🏥 Despacho de Muestras al Laboratorio
+            </span>
+          </div>
           <button
             onClick={cargarMuestras}
             className="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded-xl font-semibold"
@@ -183,7 +214,9 @@ const MuestrasPage = () => {
           <button
             onClick={() => setSearchMode('listado')}
             className={`flex-1 py-2 rounded-xl transition-all ${
-              searchMode === 'listado' ? 'bg-white text-[#129b9b] shadow' : 'text-white hover:bg-white/10'
+              searchMode === 'listado'
+                ? 'bg-white text-[#129b9b] shadow'
+                : 'text-white hover:bg-white/10'
             }`}
           >
             📋 Ver Lista
@@ -191,7 +224,9 @@ const MuestrasPage = () => {
           <button
             onClick={() => setSearchMode('codigo')}
             className={`flex-1 py-2 rounded-xl transition-all ${
-              searchMode === 'codigo' ? 'bg-white text-[#129b9b] shadow' : 'text-white hover:bg-white/10'
+              searchMode === 'codigo'
+                ? 'bg-white text-[#129b9b] shadow'
+                : 'text-white hover:bg-white/10'
             }`}
           >
             🔍 Buscar por Código
@@ -211,7 +246,9 @@ const MuestrasPage = () => {
         )}
 
         {error && (
-          <div className="bg-red-100 text-red-700 p-3 rounded-xl text-xs mb-3 font-medium">{error}</div>
+          <div className="bg-red-100 text-red-700 p-3 rounded-xl text-xs mb-3 font-medium">
+            {error}
+          </div>
         )}
 
         {cargando ? (
@@ -235,75 +272,143 @@ const MuestrasPage = () => {
                           Cliente: {m.nombre_cliente ?? '-'} (N° {m.id_cliente ?? '-'})
                         </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${est.clase}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${est.clase}`}
+                      >
                         {est.texto}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-1 text-[11px]">
-                      <p><strong>Paciente:</strong> {m.paciente ?? '-'}</p>
-                      <p><strong>Origen:</strong> {m.clinica_origen ?? '-'}</p>
-                      <p className="col-span-2"><strong>Análisis:</strong> {m.analisis ?? '-'}</p>
-                      <p><strong>Extracción:</strong> {fechaCorta(m.fecha_extraccion)}</p>
-                      {m.nro_remito && <p><strong>Remito:</strong> {m.nro_remito}</p>}
+                      <p>
+                        <strong>Paciente:</strong> {m.paciente ?? '-'}
+                      </p>
+                      <p>
+                        <strong>Origen:</strong> {m.clinica_origen ?? '-'}
+                      </p>
+                      <p className="col-span-2">
+                        <strong>Análisis:</strong> {m.analisis ?? '-'}
+                      </p>
+                      <p>
+                        <strong>Extracción:</strong> {fechaCorta(m.fecha_extraccion)}
+                      </p>
+                      {m.nro_remito && (
+                        <p>
+                          <strong>Remito:</strong> {m.nro_remito}
+                        </p>
+                      )}
                       {m.nro_precinto && (
-                        <p className="col-span-2 font-mono text-gray-500">
-                          <strong>Precinto:</strong> {m.nro_precinto}
+                        <p className="col-span-2 font-mono text-gray-600">
+                          <strong>Precinto:</strong> {m.nro_precinto}{' '}
+                          {m.estado_precinto && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-sans font-bold uppercase ${
+                                m.estado_precinto === 'roto'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-green-100 text-green-700'
+                              }`}
+                            >
+                              {m.estado_precinto}
+                            </span>
+                          )}
                         </p>
                       )}
                     </div>
 
-                    {m.resultado && (
-                      <p className="bg-[#129b9b]/10 p-2 rounded-xl text-[11px]">
-                        <strong>Resultado:</strong> {m.resultado}
-                      </p>
-                    )}
-
-                    {/* Recepción: solo una muestra en tránsito puede recibirse */}
-                    {m.estado_actual === 'en_transito' && (
-                      <div className="bg-[#129b9b]/10 p-2.5 rounded-xl border border-[#129b9b]/20 space-y-2 pt-2">
-                        <p className="font-bold text-[#129b9b] text-[10px] uppercase">Control Sanitario:</p>
-                        <div className="flex gap-2">
-                          <button
-                            disabled={ocupada}
-                            onClick={() => recibir(m.id_muestra, true)}
-                            className="flex-1 bg-green-600 text-white py-1.5 rounded-lg font-bold text-[10px] hover:bg-green-700 disabled:opacity-60 transition"
-                          >
-                            ✓ Precinto Intacto
-                          </button>
-                          <button
-                            disabled={ocupada}
-                            onClick={() => recibir(m.id_muestra, false)}
-                            className="flex-1 bg-red-600 text-white py-1.5 rounded-lg font-bold text-[10px] hover:bg-red-700 disabled:opacity-60 transition"
-                          >
-                            ✕ Precinto Roto
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Carga de resultado: solo una muestra recibida puede analizarse */}
-                    {m.estado_actual === 'recibida' && (
-                      <div className="bg-[#129b9b]/10 p-2.5 rounded-xl border border-[#129b9b]/20 space-y-2">
-                        <p className="font-bold text-[#129b9b] text-[10px] uppercase">Resultado del análisis:</p>
-                        <textarea
-                          rows={2}
-                          value={resultados[m.id_muestra] || ''}
-                          onChange={(e) =>
-                            setResultados((prev) => ({ ...prev, [m.id_muestra]: e.target.value }))
-                          }
-                          placeholder="Escribí el informe diagnóstico..."
-                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#129b9b]/50"
-                        />
+                    {/* Paso 1 del Veterinario: Empaquetar y generar Remito + Precinto */}
+                    {m.estado_actual === 'extraida' && (
+                      <div className="bg-[#129b9b]/10 p-2.5 rounded-xl border border-[#129b9b]/20 space-y-1.5 pt-2">
+                        <p className="font-bold text-[#129b9b] text-[10px] uppercase">
+                          Paso 1: Preparación de Conservadora
+                        </p>
                         <button
                           disabled={ocupada}
-                          onClick={() => finalizarAnalisis(m.id_muestra)}
-                          className="w-full bg-[#129b9b] hover:bg-[#0d7373] disabled:opacity-60 text-white py-1.5 rounded-lg font-bold text-[10px] transition"
+                          onClick={() => empaquetar(m.id_muestra)}
+                          className="w-full bg-[#129b9b] hover:bg-[#0d7373] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition"
                         >
-                          🧪 Cargar Resultados & Finalizar
+                          📦 Empaquetar (Generar Remito y Precinto)
                         </button>
                       </div>
                     )}
+
+                    {/* Paso 2 del Veterinario: Enviar al Laboratorio Central */}
+                    {m.estado_actual === 'empaquetada' && (
+                      <div className="bg-[#129b9b]/10 p-2.5 rounded-xl border border-[#129b9b]/20 space-y-2 pt-2">
+                        <p className="font-bold text-[#129b9b] text-[10px] uppercase">
+                          Paso 2: Despachar al Laboratorio Central
+                        </p>
+                        <input
+                          type="text"
+                          placeholder="Responsable de transporte (opcional)..."
+                          value={transportistas[m.id_muestra] || ''}
+                          onChange={(e) =>
+                            setTransportistas((prev) => ({
+                              ...prev,
+                              [m.id_muestra]: e.target.value,
+                            }))
+                          }
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#129b9b]/50"
+                        />
+                        <button
+                          disabled={ocupada}
+                          onClick={() => despachar(m.id_muestra)}
+                          className="w-full bg-[#0d7373] hover:bg-[#095959] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition"
+                        >
+                          🚚 Enviar Muestra al Laboratorio
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Cuando ya fue enviada, queda del lado del Laboratorio (LaboratorioOnly.jsx) */}
+                    {m.estado_actual === 'en_transito' && (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl text-[11px] font-medium">
+                        🚚 <strong>En tránsito:</strong> La muestra ya fue despachada. Esperando que el
+                        Laboratorio Central verifique el precinto y registre la recepción.
+                      </div>
+                    )}
+
+                    {m.estado_actual === 'recibida' && (
+                      <div className="bg-blue-50 border border-blue-200 text-blue-800 p-2.5 rounded-xl text-[11px] font-medium">
+                        🔬 <strong>En procesamiento:</strong> Recibida con precinto intacto en el
+                        Laboratorio Central. Aguardando informe de resultados.
+                      </div>
+                    )}
+
+                    {m.estado_actual === 'analizada' && (
+                      <div className="bg-green-50 border border-green-200 text-green-900 p-2.5 rounded-xl text-[11px]">
+                        <strong>✅ Resultado recibido del Laboratorio:</strong>
+                        <p className="mt-1">{m.resultado}</p>
+                      </div>
+                    )}
+
+                    {m.estado_actual === 'rechazada' && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-[11px] font-semibold">
+                        🚨 Muestra rechazada por el Laboratorio Central: el precinto sanitario llegó
+                        roto.
+                      </div>
+                    )}
+
+                    {/* Historial de Trazabilidad Inmutable */}
+                    {Array.isArray(m.historial_trazabilidad) &&
+                      m.historial_trazabilidad.length > 0 && (
+                        <div className="pt-1 border-t border-gray-100">
+                          <button
+                            type="button"
+                            onClick={() => toggleTrazabilidad(m.id_muestra)}
+                            className="text-[10px] font-bold text-[#0d7373] hover:underline"
+                          >
+                            {trazabilidadAbierta[m.id_muestra] ? '▼ Ocultar' : '▶ Ver'} Trazabilidad
+                            Inmutable ({m.historial_trazabilidad.length} hitos)
+                          </button>
+                          {trazabilidadAbierta[m.id_muestra] && (
+                            <div className="mt-1.5 bg-gray-50 p-2 rounded-xl border border-gray-200 space-y-1 text-[10px] font-mono text-gray-600">
+                              {m.historial_trazabilidad.map((hito, idx) => (
+                                <p key={idx}>• {hito}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     <button
                       onClick={() => handleDescargarPDF(m)}
@@ -328,4 +433,4 @@ const MuestrasPage = () => {
   );
 };
 
-export default MuestrasPage;
+export default LaboratorioPage;
