@@ -292,3 +292,113 @@ CREATE TABLE IF NOT EXISTS usuarios (
     FOREIGN KEY (id_cliente) REFERENCES clientes (id_cliente),
     FOREIGN KEY (id_veterinario) REFERENCES veterinarios (id_veterinario)
 );
+
+-- =========================================================================
+-- ==================== DATOS SEMILLA UNIFICADOS (SEED) ====================
+-- =========================================================================
+
+-- 1. Clínica, Laboratorio Central, Contenedores, Tipos de Análisis y Vacunas
+INSERT OR IGNORE INTO clinicas (id_clinica, nombre, direccion, telefono, activa) VALUES
+(1, 'Clínica Veterinaria Central', 'Av. Vélez Sarsfield 1250, Córdoba', '3514200100', 1);
+
+INSERT OR IGNORE INTO laboratorios (id_laboratorio, nombre, direccion, telefono) VALUES
+(1, 'Laboratorio Biológico Central Vet2Gö', 'Bv. Chacabuco 540, Córdoba', '3514300200');
+
+INSERT OR IGNORE INTO contenedores (id_contenedor, codigo, capacidad_muestras, temperatura_objetivo_c, estado) VALUES
+(1, 'CONT-ISO-01', 20, 4.0, 'en_uso'),
+(2, 'CONT-ISO-02', 15, 4.0, 'disponible');
+
+INSERT OR IGNORE INTO tipo_analisis (id_tipo_analisis, nombre, tipo_muestra, precio, temperatura_almacenamiento_c) VALUES
+(1, 'Hemograma Completo', 'sangre', 12000, 4.0),
+(2, 'Perfil Bioquímico Renal y Hepático', 'sangre', 15500, 4.0),
+(3, 'Urianálisis Completo y Sedimento', 'orina', 9500, 4.0),
+(4, 'Citología e Histopatología', 'tejido', 18000, 4.0),
+(5, 'Coproparasitológico Seriado', 'otro', 8500, 4.0);
+
+INSERT OR IGNORE INTO vacunas (id_vacuna, nombre, descripcion, precio) VALUES
+(1, 'Antirrábica Anual', 'Vacuna obligatoria contra el virus de la rabia', 10000),
+(2, 'Séxtuple Canina', 'Moquillo, Parvovirus, Adenovirus, Parainfluenza y Leptospira', 14000),
+(3, 'Triple Felina', 'Rinotraqueítis, Calicivirus y Panleucopenia felina', 13500);
+
+-- 2. Cuatro Clientes
+INSERT OR IGNORE INTO clientes (id_cliente, nombre, apellido, dni, telefono, email, direccion, activo) VALUES
+(1, 'Juan', 'Pérez', '35111222', '3515111222', 'juan.perez@email.com', 'Av. Colón 1450', 1),
+(2, 'María', 'Gómez', '38222333', '3515222333', 'maria.gomez@email.com', 'Obispo Trejo 850', 1),
+(3, 'Lucas', 'Rodríguez', '40333444', '3515333444', 'lucas.rodriguez@email.com', 'Av. Rafael Núñez 3900', 1),
+(4, 'Sofía', 'Martínez', '42444555', '3515444555', 'sofia.martinez@email.com', 'Gral. Paz 420', 1);
+
+-- 3. Ocho Mascotas (2 por cliente: perro, gato, ave, conejo, otro)
+INSERT OR IGNORE INTO mascotas (id_mascota, nombre, especie, raza, sexo, fecha_nacimiento, id_cliente, activo) VALUES
+(1, 'Rocco', 'perro', 'Ovejero Alemán', 'macho', '2021-05-14', 1, 1),
+(2, 'Mishi', 'gato', 'Siamés', 'hembra', '2022-08-20', 1, 1),
+(3, 'Paco', 'ave', 'Loro Amazónico', 'macho', '2020-11-10', 2, 1),
+(4, 'Copito', 'conejo', 'Cabeza de León', 'hembra', '2023-02-15', 2, 1),
+(5, 'Thor', 'perro', 'Golden Retriever', 'macho', '2019-09-03', 3, 1),
+(6, 'Tortu', 'otro', 'Tortuga Terrestre', 'hembra', '2018-01-25', 3, 1),
+(7, 'Luna', 'gato', 'Mestizo Europeo', 'hembra', '2022-04-12', 4, 1),
+(8, 'Tambor', 'conejo', 'Californiano', 'macho', '2023-07-08', 4, 1);
+
+-- 4. Historias Clínicas (1 a 1 con cada mascota)
+INSERT OR IGNORE INTO historias_clinicas (id_historia_clinica, id_mascota, fecha_apertura, observaciones) VALUES
+(1, 1, '2026-01-10', 'Historia clínica inicial - Rocco'),
+(2, 2, '2026-01-10', 'Historia clínica inicial - Mishi'),
+(3, 3, '2026-01-12', 'Historia clínica inicial - Paco'),
+(4, 4, '2026-01-12', 'Historia clínica inicial - Copito'),
+(5, 5, '2026-01-15', 'Historia clínica inicial - Thor'),
+(6, 6, '2026-01-15', 'Historia clínica inicial - Tortu'),
+(7, 7, '2026-01-18', 'Historia clínica inicial - Luna'),
+(8, 8, '2026-01-18', 'Historia clínica inicial - Tambor');
+
+-- 5. Dos Veterinarios
+INSERT OR IGNORE INTO veterinarios (id_veterinario, nombre, apellido, matricula, clinica_id) VALUES
+(1, 'Franco', 'Gutiérrez', 'MP-1001', 1),
+(2, 'Paola', 'Benítez', 'MP-1002', 1);
+
+-- 6. Usuarios (1 Admin, 1 Laboratorio 'labo1', 2 Veterinarios, 4 Clientes)
+INSERT OR IGNORE INTO usuarios (id_usuario, usuario, password_hash, rol, nombre, apellido, email, telefono, matricula, id_cliente, id_veterinario) VALUES
+(1, 'admin', '1234', 'admin', 'Administrador', 'General', 'admin@vet2go.com', '3514000001', 'MP-0001', NULL, NULL),
+(2, 'labo1', 'Labo123', 'laboratorio', 'Operador', 'Laboratorio', 'labo1@vet2go.com', '3514000002', NULL, NULL, NULL),
+(3, 'vet_franco', '1234', 'veterinario', 'Franco', 'Gutiérrez', 'franco@vet2go.com', '3514000003', 'MP-1001', NULL, 1),
+(4, 'vet_paola', '1234', 'veterinario', 'Paola', 'Benítez', 'paola@vet2go.com', '3514000004', 'MP-1002', NULL, 2),
+(5, 'juan', '1234', 'cliente', 'Juan', 'Pérez', 'juan.perez@email.com', '3515111222', NULL, 1, NULL),
+(6, 'maria', '1234', 'cliente', 'María', 'Gómez', 'maria.gomez@email.com', '3515222333', NULL, 2, NULL),
+(7, 'lucas', '1234', 'cliente', 'Lucas', 'Rodríguez', 'lucas.rodriguez@email.com', '3515333444', NULL, 3, NULL),
+(8, 'sofia', '1234', 'cliente', 'Sofía', 'Martínez', 'sofia.martinez@email.com', '3515444555', NULL, 4, NULL);
+
+-- 7. Consultas, Órdenes de Derivación, Remitos, Precintos y Muestras de Prueba
+-- (Necesarios para que el INNER JOIN de Laboratorio muestre datos desde el inicio)
+INSERT OR IGNORE INTO consultas (id_consulta, historia_clinica_id, veterinario_id, clinica_id, turno_id, fecha_hora, tipo, motivo, diagnostico, tratamiento, peso_kg) VALUES
+(1, 1, 1, 1, NULL, '2026-11-12 09:00:00', 'consulta', 'Control prequirúrgico y decaimiento', 'Sospecha de anemia leve', 'Solicito Hemograma Completo', 32.5),
+(2, 2, 2, 1, NULL, '2026-11-12 09:30:00', 'consulta', 'Polidipsia y poliuria', 'Control renal preventivo', 'Solicito Urianálisis Completo', 4.2),
+(3, 5, 1, 1, NULL, '2026-11-12 10:00:00', 'urgencia', 'Vómitos y letargo agudo', 'Evaluación hepática urgente', 'Solicito Perfil Bioquímico', 29.0);
+
+INSERT OR IGNORE INTO ordenes_derivacion (id_orden_derivacion, id_consulta, tipo_analisis_id, id_laboratorio, fecha_emision, indicaciones, prioridad) VALUES
+(1, 1, 1, 1, '2026-11-12 09:10:00', 'Ayuno de 8 hs cumplido', 'media'),
+(2, 2, 3, 1, '2026-11-12 09:40:00', 'Muestra refrigerada a 4°C', 'alta'),
+(3, 3, 2, 1, '2026-11-12 10:10:00', 'Urgencia clínica', 'alta');
+
+INSERT OR IGNORE INTO precintos (id_precinto, codigo, estado, fecha_colocacion) VALUES
+(1, 'PREC-0001-9015', 'intacto', '2026-11-12 09:20:00'),
+(2, 'PREC-0002-9045', 'intacto', '2026-11-12 09:50:00');
+
+INSERT OR IGNORE INTO remitos_biologicos (id_remito_biologico, numero_remito, clinica_origen_id, laboratorio_destino_id, contenedor_id, precinto_id, fecha_emision, estado) VALUES
+(1, 'REM-0001-9015', 1, 1, 1, 1, '2026-11-12 09:20:00', 'en_transito'),
+(2, 'REM-0002-9045', 1, 1, 2, 2, '2026-11-12 09:50:00', 'recibido');
+
+INSERT OR IGNORE INTO muestras (id_muestra, orden_derivacion_id, remito_id, codigo, tipo, fecha_extraccion, estado_actual) VALUES
+-- Muestra 1: Ya está EN TRÁNSITO (lista para que 'labo1' verifique el precinto en LaboratorioOnly.jsx)
+(1, 1, 1, 'MUE-2026-001', 'sangre', '2026-11-12 09:15:00', 'en_transito'),
+-- Muestra 2: Ya está RECIBIDA (lista para que 'labo1' cargue el resultado y lo envíe de vuelta)
+(2, 2, 2, 'MUE-2026-002', 'orina', '2026-11-12 09:45:00', 'recibida'),
+-- Muestra 3: Está EXTRAÍDA en la clínica (lista para que 'vet_franco' la empaquete y despache en LaboratorioPage.jsx)
+(3, 3, NULL, 'MUE-2026-003', 'sangre', '2026-11-12 10:15:00', 'extraida');
+
+INSERT OR IGNORE INTO historial_estado_muestras (id_historial_estado_muestra, muestra_id, estado, fecha_hora, usuario, observaciones) VALUES
+(1, 1, 'extraida', '2026-11-12 09:15:00', 'vet_franco', 'Extracción inicial de muestra biológica'),
+(2, 1, 'empaquetada', '2026-11-12 09:20:00', 'vet_franco', 'Empaquetada en CONT-ISO-01 con precinto PREC-0001-9015'),
+(3, 1, 'en_transito', '2026-11-12 09:25:00', 'Transporte Vet2Gö', 'Despachada hacia Laboratorio Central'),
+(4, 2, 'extraida', '2026-11-12 09:45:00', 'vet_paola', 'Extracción inicial de muestra biológica'),
+(5, 2, 'empaquetada', '2026-11-12 09:50:00', 'vet_paola', 'Empaquetada en CONT-ISO-02 con precinto PREC-0002-9045'),
+(6, 2, 'en_transito', '2026-11-12 09:55:00', 'Transporte Vet2Gö', 'Despachada hacia Laboratorio Central'),
+(7, 2, 'recibida', '2026-11-12 10:10:00', 'labo1', 'Precinto verificado intacto en recepción'),
+(8, 3, 'extraida', '2026-11-12 10:15:00', 'vet_franco', 'Extracción inicial en guardia');
