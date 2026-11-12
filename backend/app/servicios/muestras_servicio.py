@@ -14,31 +14,63 @@ class ServicioMuestras:
         self.db = DatabaseSingleton()
 
     def _mapear_a_respuesta(self, muestra: dict) -> dict:
-        cursor = self.db.get_conexion().execute(
+        conn = self.db.get_conexion()
+
+        # Historial de estados (trazabilidad)
+        cursor = conn.execute(
             "SELECT estado, fecha_hora, usuario, observaciones FROM historial_estado_muestras WHERE muestra_id = ? ORDER BY id_historial_estado_muestra ASC",
             (muestra["id_muestra"],)
         )
         trazabilidad = [
-            f"[{f['fecha_hora']}] Estado: {f['estado']} | Usuario: {f.get('usuario') or 'Sistema'}"
+            f"[{f['fecha_hora']}] Estado: {f['estado']} | Usuario: {f['usuario'] or 'Sistema'}"
             for f in cursor.fetchall()
         ]
 
+        # Datos de la tarjeta: muestra → orden → consulta → historia → mascota
+        cursor = conn.execute(
+            """
+            SELECT ma.nombre AS paciente,
+                   ma.id_cliente AS id_cliente,
+                   cli.nombre || ' ' || cli.apellido AS nombre_cliente,
+                   ta.nombre AS analisis,
+                   cl.nombre AS clinica_origen,
+                   r.numero_remito AS nro_remito,
+                   p.codigo AS nro_precinto,
+                   p.estado AS estado_precinto,
+                   ra.resultado AS resultado
+            FROM muestras m
+            JOIN ordenes_derivacion od ON od.id_orden_derivacion = m.orden_derivacion_id
+            JOIN consultas c ON c.id_consulta = od.id_consulta
+            JOIN historias_clinicas h ON h.id_historia_clinica = c.historia_clinica_id
+            JOIN mascotas ma ON ma.id_mascota = h.id_mascota
+            JOIN clientes cli ON cli.id_cliente = ma.id_cliente
+            JOIN tipo_analisis ta ON ta.id_tipo_analisis = od.tipo_analisis_id
+            JOIN clinicas cl ON cl.id_clinica = c.clinica_id
+            LEFT JOIN remitos_biologicos r ON r.id_remito_biologico = m.remito_id
+            LEFT JOIN precintos p ON p.id_precinto = r.precinto_id
+            LEFT JOIN resultados_analisis ra ON ra.muestra_id = m.id_muestra
+            WHERE m.id_muestra = ?
+            """,
+            (muestra["id_muestra"],)
+        )
+        fila = cursor.fetchone()
+        extra = dict(fila) if fila else {}
+
         return {
             "id_muestra": muestra["id_muestra"],
-            "codigo_etiqueta": muestra["codigo"],
-            "id_orden_derivacion": muestra["orden_derivacion_id"],
-            "tipo_muestra": muestra.get("tipo", "sangre"),
+            "orden_derivacion_id": muestra["orden_derivacion_id"],
+            "remito_id": muestra["remito_id"],
+            "codigo": muestra["codigo"],
+            "tipo": muestra["tipo"],
+            "fecha_extraccion": muestra["fecha_extraccion"],
             "estado_actual": muestra["estado_actual"],
-            "id_conservadora": muestra.get("remito_id"),
-            "nro_precinto": None,
-            "transporte_info": None,
-            "id_resultado": None,
             "historial_trazabilidad": trazabilidad,
+            **extra,
         }
 
     def registrar_extraccion(self, datos_crear) -> dict:
         datos = datos_crear if isinstance(datos_crear, dict) else datos_crear.model_dump()
-        tipo_str = str(datos.get("tipo_muestra", "sangre")).lower()
+        tipo_str = str(datos.get("tipo") or "sangre").lower()
 
         conn = self.db.get_conexion()
         cursor = conn.execute(
@@ -46,7 +78,7 @@ class ServicioMuestras:
             INSERT INTO muestras (orden_derivacion_id, codigo, tipo, fecha_extraccion, estado_actual)
             VALUES (?, ?, ?, datetime('now', 'localtime'), 'extraida')
             """,
-            (datos["id_orden_derivacion"], datos["codigo_etiqueta"], tipo_str)
+            (datos["orden_derivacion_id"], datos["codigo"], tipo_str)
         )
         conn.commit()
         id_muestra = cursor.lastrowid
@@ -70,19 +102,35 @@ class ServicioMuestras:
 
     def recibir_en_laboratorio(self, id_muestra: int, datos_recepcion) -> dict:
         datos = datos_recepcion if isinstance(datos_recepcion, dict) else datos_recepcion.model_dump()
-        estado_precinto = "intacto" if datos.get("precinto_intacto", True) else "roto"
+        estado_precinto = getattr(datos["estado_precinto"], "value", datos["estado_precinto"])
 
         # Si el precinto está roto, MuestraDAO pasa el estado automáticamente a rechazada
         self.muestra_dao.cambiar_estado(
             id_muestra,
             nuevo_estado="recibida",
             estado_precinto=estado_precinto,
-            usuario="Bioquímico"
+            usuario=datos.get("recibido_por") or "Bioquímico"
         )
         return self.obtener_por_id(id_muestra)
 
     def registrar_analisis(self, id_muestra: int, datos_analisis) -> dict:
-        self.muestra_dao.cambiar_estado(id_muestra, nuevo_estado="analizada", usuario="Bioquímico")
+        datos = datos_analisis if isinstance(datos_analisis, dict) else datos_analisis.model_dump()
+
+        self.muestra_dao.cambiar_estado(
+            id_muestra,
+            nuevo_estado="analizada",
+            usuario=datos.get("validado_por") or "Bioquímico"
+        )
+
+        conn = self.db.get_conexion()
+        conn.execute(
+            """
+            INSERT INTO resultados_analisis (muestra_id, fecha_resultado, resultado, validado_por)
+            VALUES (?, datetime('now', 'localtime'), ?, ?)
+            """,
+            (id_muestra, datos["resultado"], datos.get("validado_por")),
+        )
+        conn.commit()
         return self.obtener_por_id(id_muestra)
 
     def obtener_por_id(self, id_muestra: int) -> dict:

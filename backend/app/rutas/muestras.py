@@ -46,6 +46,8 @@ def empaquetar_muestra(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
 @router.post(
@@ -63,6 +65,8 @@ def despachar_muestra(
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
@@ -83,6 +87,9 @@ def recibir_muestra_en_laboratorio(
     except ExcepcionTransicionEstado as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
 
 @router.post(
     "/{id_muestra}/analizar",
@@ -99,6 +106,8 @@ def registrar_analisis_muestra(
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
