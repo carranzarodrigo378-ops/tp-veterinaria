@@ -1,16 +1,31 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from app.servicios.reportes_servicio import servicio_reportes
 from app.rutas.dependencias import requerir_rol
 
 router = APIRouter(prefix="/api/reportes", tags=["Reportes e Informes"])
 
+# Reportes gerenciales/contables exclusivos para el rol 'admin'
+REPORTES_EXCLUSIVOS_ADMIN = {
+    "productividad-veterinarios",
+    "facturacion",
+    "demografia-mascotas",
+}
 
-@router.get(
-    "/resumen-general",
-    dependencies=[Depends(requerir_rol(["admin", "veterinario"]))],
-)
-def obtener_resumen_general():
-    return servicio_reportes.reporte_resumen_general()
+
+# =========================================================================
+# 1. REPORTES CLÍNICOS Y OPERATIVOS (ACCESO: ADMIN Y VETERINARIO)
+# =========================================================================
+
+@router.get("/resumen-general")
+def obtener_resumen_general(
+    usuario_actual: dict = Depends(requerir_rol(["admin", "veterinario"])),
+):
+    datos = servicio_reportes.reporte_resumen_general()
+    # Si es veterinario, ocultamos el monto contable de facturación general
+    if usuario_actual.get("rol") != "admin" and isinstance(datos, dict):
+        datos = {k: v for k, v in datos.items() if k != "facturacion_total"}
+    return datos
 
 
 @router.get(
@@ -69,4 +84,122 @@ def obtener_reporte_atenciones_variable(
         veterinarios_ids=veterinarios_ids,
         clinica_id=clinica_id,
         especie=especie,
+    )
+
+
+@router.get(
+    "/turnos",
+    dependencies=[Depends(requerir_rol(["admin", "veterinario"]))],
+)
+def obtener_reporte_turnos():
+    return servicio_reportes.reporte_estado_turnos()
+
+
+# =========================================================================
+# 2. REPORTES GERENCIALES Y AUDITORÍA (ACCESO EXCLUSIVO: ADMIN)
+# =========================================================================
+
+@router.get(
+    "/productividad-veterinarios",
+    dependencies=[Depends(requerir_rol(["admin"]))],
+)
+def obtener_productividad_veterinarios():
+    return servicio_reportes.reporte_productividad_veterinarios()
+
+
+@router.get(
+    "/facturacion",
+    dependencies=[Depends(requerir_rol(["admin"]))],
+)
+def obtener_reporte_facturacion():
+    return servicio_reportes.reporte_facturacion_detallada()
+
+
+@router.get(
+    "/demografia-mascotas",
+    dependencies=[Depends(requerir_rol(["admin"]))],
+)
+def obtener_demografia_mascotas():
+    return servicio_reportes.reporte_demografia_mascotas()
+
+
+# =========================================================================
+# 3. EXPORTACIÓN EN PDF (REPORTLAB + MATPLOTLIB) Y CSV SEGÚN ROL
+# =========================================================================
+
+@router.get("/exportar/pdf/{tipo_reporte}")
+def descargar_reporte_pdf(
+    tipo_reporte: str,
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+    veterinarios_ids: list[int] | None = Query(default=None),
+    clinica_id: int | None = Query(default=None),
+    especie: str | None = Query(default=None),
+    usuario_actual: dict = Depends(requerir_rol(["admin", "veterinario"])),
+):
+    """
+    Exporta el reporte en PDF con ReportLab y gráficos de Matplotlib.
+    Valida que un veterinario no pueda descargar reportes exclusivos de administrador.
+    """
+    if (
+        tipo_reporte in REPORTES_EXCLUSIVOS_ADMIN
+        and usuario_actual.get("rol") != "admin"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: este reporte gerencial es exclusivo para administradores.",
+        )
+
+    buffer_pdf = servicio_reportes.construir_pdf_reporte(
+        tipo_reporte=tipo_reporte,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        veterinarios_ids=veterinarios_ids,
+        clinica_id=clinica_id,
+        especie=especie,
+    )
+    nombre_archivo = f"reporte_{tipo_reporte}.pdf"
+    return StreamingResponse(
+        buffer_pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
+    )
+
+
+@router.get("/exportar/csv/{tipo_reporte}")
+def descargar_reporte_csv(
+    tipo_reporte: str,
+    fecha_desde: str | None = Query(default=None),
+    fecha_hasta: str | None = Query(default=None),
+    veterinarios_ids: list[int] | None = Query(default=None),
+    clinica_id: int | None = Query(default=None),
+    especie: str | None = Query(default=None),
+    usuario_actual: dict = Depends(requerir_rol(["admin", "veterinario"])),
+):
+    """
+    Exporta el reporte en formato CSV usando la biblioteca estándar csv de Python.
+    Valida que un veterinario no pueda descargar reportes exclusivos de administrador.
+    """
+    if (
+        tipo_reporte in REPORTES_EXCLUSIVOS_ADMIN
+        and usuario_actual.get("rol") != "admin"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: este reporte gerencial es exclusivo para administradores.",
+        )
+
+    buffer_csv = servicio_reportes.construir_csv_reporte(
+        tipo_reporte=tipo_reporte,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        veterinarios_ids=veterinarios_ids,
+        clinica_id=clinica_id,
+        especie=especie,
+    )
+    nombre_archivo = f"reporte_{tipo_reporte}.csv"
+    return StreamingResponse(
+        iter([buffer_csv.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={nombre_archivo}"},
     )

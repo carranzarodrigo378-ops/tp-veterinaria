@@ -75,26 +75,21 @@ const ReportesPage = () => {
     setCargando(true);
     setError('');
     try {
+      // 1. Reportes clínicos y operativos (accesibles para Admin y Veterinario)
       const [
         resGeneral,
         resAtenciones,
         resCalidad,
         resDerivaciones,
         resVacunas,
-        resProd,
-        resFact,
         resTurnos,
-        resDemo,
       ] = await Promise.all([
         fetchConAuth('/resumen-general'),
         fetchConAuth(`/atenciones${armarQueryAtenciones()}`),
         fetchConAuth('/calidad-muestras'),
         fetchConAuth('/derivaciones-tipo'),
         fetchConAuth('/alertas-vacunas'),
-        fetchConAuth('/productividad-veterinarios'),
-        fetchConAuth('/facturacion'),
         fetchConAuth('/turnos'),
-        fetchConAuth('/demografia-mascotas'),
       ]);
 
       setResumen(resGeneral);
@@ -102,17 +97,26 @@ const ReportesPage = () => {
       setCalidadMuestras(Array.isArray(resCalidad) ? resCalidad : []);
       setDerivaciones(Array.isArray(resDerivaciones) ? resDerivaciones : []);
       setAlertasVacunas(Array.isArray(resVacunas) ? resVacunas : []);
-      setProductividad(Array.isArray(resProd) ? resProd : []);
-      setFacturacion(resFact);
       setTurnos(resTurnos);
-      setDemografia(resDemo);
+
+      // 2. Reportes gerenciales, contables y de auditoría (exclusivos para Admin)
+      if (role === 'admin') {
+        const [resProd, resFact, resDemo] = await Promise.all([
+          fetchConAuth('/productividad-veterinarios'),
+          fetchConAuth('/facturacion'),
+          fetchConAuth('/demografia-mascotas'),
+        ]);
+        setProductividad(Array.isArray(resProd) ? resProd : []);
+        setFacturacion(resFact);
+        setDemografia(resDemo);
+      }
     } catch (err) {
       setError('No se pudieron cargar algunos reportes desde el servidor.');
       console.error(err);
     } finally {
       setCargando(false);
     }
-  }, [token, fetchConAuth, armarQueryAtenciones]);
+  }, [token, role, fetchConAuth, armarQueryAtenciones]);
 
   useEffect(() => {
     cargarTodosLosReportes();
@@ -214,7 +218,12 @@ const ReportesPage = () => {
           >
             ‹ Volver
           </button>
-          <h2 className="font-bold text-lg text-center">Reportes y Estadísticas (UTN-FRC)</h2>
+          <div className="text-center">
+            <h2 className="font-bold text-lg">Reportes y Estadísticas (UTN-FRC)</h2>
+            <p className="text-[11px] text-white/80">
+              Vista {role === 'admin' ? 'Gerencial Completa (Administrador)' : 'Clínica y Operativa (Veterinario)'}
+            </p>
+          </div>
           <button
             onClick={cargarTodosLosReportes}
             className="text-xs bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-xl font-semibold"
@@ -247,10 +256,17 @@ const ReportesPage = () => {
               <p className="text-[11px] opacity-80">Muestras Totales</p>
               <p className="text-lg font-extrabold">{resumen.total_muestras ?? 0}</p>
             </div>
-            <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
-              <p className="text-[11px] opacity-80">Facturación Total</p>
-              <p className="text-lg font-extrabold">${resumen.facturacion_total ?? 0}</p>
-            </div>
+            {role === 'admin' ? (
+              <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
+                <p className="text-[11px] opacity-80">Facturación Total</p>
+                <p className="text-lg font-extrabold">${resumen.facturacion_total ?? 0}</p>
+              </div>
+            ) : (
+              <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
+                <p className="text-[11px] opacity-80">Remitos en Tránsito</p>
+                <p className="text-lg font-extrabold">{resumen.remitos_en_transito ?? 0}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -260,6 +276,10 @@ const ReportesPage = () => {
           </div>
         ) : (
           <div className="space-y-3.5 text-gray-800">
+            {/* =================================================================
+                REPORTES CLÍNICOS Y OPERATIVOS (VISIBLES PARA VETERINARIO Y ADMIN)
+                ================================================================= */}
+
             {/* 1. REPORTE DINÁMICO DE ATENCIONES (PEDIDO DEL PROFESOR) */}
             <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-2">
               <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
@@ -423,46 +443,10 @@ const ReportesPage = () => {
               <BotonesExportacion tipo="alertas-vacunas" />
             </div>
 
-            {/* 5. PRODUCTIVIDAD POR VETERINARIO */}
+            {/* 5. GESTIÓN DE TURNOS (OPERATIVO PARA VETERINARIO Y ADMIN) */}
             <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
               <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                <span>5. Productividad por Profesional Veterinario</span>
-                <span>👨‍⚕️</span>
-              </h3>
-              {productividad.map((vet) => (
-                <p key={vet.id_veterinario} className="text-gray-600 pt-0.5">
-                  • {vet.veterinario} ({vet.matricula}):{' '}
-                  <strong>
-                    {vet.total_consultas} consultas | {vet.mascotas_unicas_atendidas} mascotas |{' '}
-                    {vet.ordenes_derivadas} derivaciones
-                  </strong>
-                </p>
-              ))}
-              <BotonesExportacion tipo="productividad-veterinarios" />
-            </div>
-
-            {/* 6. FACTURACIÓN Y COMPROBANTES EMITIDOS */}
-            <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
-              <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                <span>6. Facturación y Comprobantes de Atención</span>
-                <span>🧾</span>
-              </h3>
-              <p className="text-gray-600 pt-1">
-                Comprobantes emitidos: <strong>{facturacion?.cantidad_comprobantes ?? 0}</strong> | Recaudación
-                Total: <strong>${facturacion?.recaudacion_total ?? 0}</strong>
-              </p>
-              {facturacion?.desglose_por_rubro?.map((r, i) => (
-                <p key={i} className="text-gray-500 text-[11px]">
-                  • Rubro {r.rubro}: <strong>${r.recaudacion}</strong> ({r.items_vendidos} ítems)
-                </p>
-              ))}
-              <BotonesExportacion tipo="facturacion" />
-            </div>
-
-            {/* 7. GESTIÓN DE TURNOS */}
-            <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
-              <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                <span>7. Estado de Turnos Programados</span>
+                <span>5. Estado de Turnos Programados</span>
                 <span>📅</span>
               </h3>
               <p className="text-gray-600 pt-1">
@@ -478,20 +462,69 @@ const ReportesPage = () => {
               <BotonesExportacion tipo="turnos" />
             </div>
 
-            {/* 8. PADRÓN DEMOGRÁFICO Y AUDITORÍA DE BAJAS LÓGICAS */}
-            <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
-              <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                <span>8. Padrón de Mascotas y Bajas Lógicas</span>
-                <span>🐾</span>
-              </h3>
-              {demografia?.distribucion_especies?.map((esp, i) => (
-                <p key={i} className="text-gray-600 pt-0.5">
-                  • {esp.especie.toUpperCase()}: <strong>{esp.total} totales</strong> ({esp.activas} activas /{' '}
-                  {esp.bajas_logicas} dadas de baja lógica)
-                </p>
-              ))}
-              <BotonesExportacion tipo="demografia-mascotas" />
-            </div>
+            {/* =================================================================
+                REPORTES GERENCIALES Y AUDITORÍA (EXCLUSIVOS PARA ROL ADMIN)
+                ================================================================= */}
+            {role === 'admin' && (
+              <>
+                <div className="pt-2 pb-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-white/90 bg-white/15 px-3 py-1 rounded-full">
+                    🔒 Reportes Gerenciales y Contables (Exclusivo Administración)
+                  </span>
+                </div>
+
+                {/* 6. PRODUCTIVIDAD POR VETERINARIO */}
+                <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
+                  <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
+                    <span>6. Productividad por Profesional Veterinario</span>
+                    <span>👨‍⚕️</span>
+                  </h3>
+                  {productividad.map((vet) => (
+                    <p key={vet.id_veterinario} className="text-gray-600 pt-0.5">
+                      • {vet.veterinario} ({vet.matricula}):{' '}
+                      <strong>
+                        {vet.total_consultas} consultas | {vet.mascotas_unicas_atendidas} mascotas |{' '}
+                        {vet.ordenes_derivadas} derivaciones
+                      </strong>
+                    </p>
+                  ))}
+                  <BotonesExportacion tipo="productividad-veterinarios" />
+                </div>
+
+                {/* 7. FACTURACIÓN Y COMPROBANTES EMITIDOS */}
+                <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
+                  <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
+                    <span>7. Facturación y Comprobantes de Atención</span>
+                    <span>🧾</span>
+                  </h3>
+                  <p className="text-gray-600 pt-1">
+                    Comprobantes emitidos: <strong>{facturacion?.cantidad_comprobantes ?? 0}</strong> | Recaudación
+                    Total: <strong>${facturacion?.recaudacion_total ?? 0}</strong>
+                  </p>
+                  {facturacion?.desglose_por_rubro?.map((r, i) => (
+                    <p key={i} className="text-gray-500 text-[11px]">
+                      • Rubro {r.rubro}: <strong>${r.recaudacion}</strong> ({r.items_vendidos} ítems)
+                    </p>
+                  ))}
+                  <BotonesExportacion tipo="facturacion" />
+                </div>
+
+                {/* 8. PADRÓN DEMOGRÁFICO Y AUDITORÍA DE BAJAS LÓGICAS */}
+                <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
+                  <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
+                    <span>8. Padrón de Mascotas y Bajas Lógicas</span>
+                    <span>🐾</span>
+                  </h3>
+                  {demografia?.distribucion_especies?.map((esp, i) => (
+                    <p key={i} className="text-gray-600 pt-0.5">
+                      • {esp.especie.toUpperCase()}: <strong>{esp.total} totales</strong> ({esp.activas} activas /{' '}
+                      {esp.bajas_logicas} dadas de baja lógica)
+                    </p>
+                  ))}
+                  <BotonesExportacion tipo="demografia-mascotas" />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
