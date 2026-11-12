@@ -14,8 +14,34 @@ class MuestraDAO(BaseDAO):
             return EntidadDuplicadaError("Ya existe una muestra con ese código de barras.")
         return super()._traducir_integridad(e)
 
-    def crear(self, muestra: MuestraCrear) -> int:
-        return self._insertar(muestra.model_dump(exclude_unset=True))
+    def crear(self, muestra: MuestraCrear, usuario: str = "sistema") -> int:
+        conn = self.db.get_conexion()
+        cursor = conn.cursor()
+        datos = muestra.model_dump(exclude_unset=True)
+
+        try:
+            # 1. Insertar la muestra física
+            columnas = ", ".join(datos.keys())
+            placeholders = ", ".join("?" for _ in datos)
+            sql_muestra = f"INSERT INTO {self.TABLA} ({columnas}) VALUES ({placeholders})"
+            cursor.execute(sql_muestra, tuple(datos.values()))
+            id_muestra_creada = cursor.lastrowid
+
+            # 2. Registrar el paso 1 de la trazabilidad (Doble escritura obligatoria)
+            sql_historial = """
+                INSERT INTO historial_estado_muestras (muestra_id, estado, fecha_hora, usuario, observaciones)
+                VALUES (?, 'extraida', ?, ?, 'Extracción inicial en clínica')
+            """
+            cursor.execute(sql_historial, (id_muestra_creada, datos["fecha_extraccion"], usuario))
+            
+            conn.commit()
+            return id_muestra_creada
+        except sqlite3.IntegrityError as e:
+            conn.rollback()
+            raise self._traducir_integridad(e)
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise ValueError("Error al registrar la muestra y su trazabilidad.") from e
 
     def actualizar(self, id_muestra: int, datos: MuestraActualizar) -> bool:
         return self._actualizar(id_muestra, datos.model_dump(exclude_unset=True))

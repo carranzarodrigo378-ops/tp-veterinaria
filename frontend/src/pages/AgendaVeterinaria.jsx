@@ -26,6 +26,11 @@ const AgendaVeterinarioPage = () => {
   const [error, setError] = useState('');
   const [fecha, setFecha] = useState(hoyISO());
 
+  // Estados para el Modal de Edición
+  const [turnoSeleccionado, setTurnoSeleccionado] = useState(null);
+  const [nuevoEstado, setNuevoEstado] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
   // Sesión válida y rol correcto
   const expiration = localStorage.getItem('token_expiration');
   const sesionValida =
@@ -38,7 +43,7 @@ const AgendaVeterinarioPage = () => {
     if (!sesionValida) navigate('/login');
   }, [sesionValida, navigate]);
 
-  // Obtener los turnos desde el endpoint del backend pasando la fecha seleccionada
+  // Obtener los turnos desde el endpoint del backend
   const obtenerTurnos = useCallback(async () => {
     try {
       setCargando(true);
@@ -77,6 +82,45 @@ const AgendaVeterinarioPage = () => {
     if (sesionValida) obtenerTurnos();
   }, [sesionValida, obtenerTurnos]);
 
+  // Funciones de acción del Modal
+  const abrirModal = (turno) => {
+    setTurnoSeleccionado(turno);
+    setNuevoEstado(turno.estado || 'programado');
+  };
+
+  const cerrarModal = () => {
+    setTurnoSeleccionado(null);
+    setNuevoEstado('');
+  };
+
+  const guardarCambioEstado = async (e) => {
+    e.preventDefault();
+
+    // LÓGICA DE DERIVACIÓN: Si marca "Atendido", lo llevamos a la pantalla clínica
+    if (nuevoEstado === 'atendido') {
+      cerrarModal();
+      const idMascota = turnoSeleccionado.mascota_id ?? turnoSeleccionado.id_mascota;
+      // Redirigimos pasándole los IDs necesarios para arrancar la consulta
+      navigate(`/consulta/nueva?turno=${turnoSeleccionado.id_turno}&mascota=${idMascota}`);
+      return; 
+    }
+
+    // Si solo lo está cancelando o volviendo a programar, hacemos la petición normal
+    try {
+      setGuardando(true);
+      await api.patch(`/api/clinica/turnos/${turnoSeleccionado.id_turno}/estado`, {
+        estado: nuevoEstado,
+      });
+      cerrarModal();
+      obtenerTurnos(); // Recargamos la lista para ver el cambio
+    } catch (err) {
+      console.error('Error al actualizar turno:', err);
+      alert('Error al guardar el estado: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   // Navegación entre días
   const moverDia = (n) => {
     const d = new Date(`${fecha}T00:00:00`);
@@ -92,7 +136,6 @@ const AgendaVeterinarioPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
-      {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
@@ -100,20 +143,20 @@ const AgendaVeterinarioPage = () => {
 
       <div className="relative z-10 w-full max-w-md min-h-screen md:min-h-[680px] bg-[#129b9b] md:rounded-3xl shadow-2xl p-5 text-white overflow-y-auto">
         {/* Barra superior */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 border-b border-white/20 pb-4">
           <button
             onClick={() => navigate('/home')}
-            className="text-sm font-semibold hover:underline"
+            className="text-sm font-semibold hover:underline bg-white/10 px-3 py-1 rounded-xl cursor-pointer"
           >
             ‹ Volver
           </button>
           <h2 className="font-bold text-lg">Turnos Asignados</h2>
-          <div className="w-6"></div>
+          <div className="w-16"></div> {/* Espaciador para centrar el título */}
         </div>
 
         {/* Selector de día */}
         <div className="flex items-center justify-between bg-white/10 rounded-2xl p-2 mb-3">
-          <button onClick={() => moverDia(-1)} className="px-3 py-1 font-bold">
+          <button onClick={() => moverDia(-1)} className="px-3 py-1 font-bold cursor-pointer hover:bg-white/20 rounded-lg transition">
             ‹
           </button>
 
@@ -127,28 +170,28 @@ const AgendaVeterinarioPage = () => {
             {fecha !== hoyISO() && (
               <button
                 onClick={() => setFecha(hoyISO())}
-                className="block mx-auto text-[11px] underline"
+                className="block mx-auto text-[11px] underline mt-0.5 cursor-pointer"
               >
                 Ir a hoy
               </button>
             )}
           </div>
 
-          <button onClick={() => moverDia(1)} className="px-3 py-1 font-bold">
+          <button onClick={() => moverDia(1)} className="px-3 py-1 font-bold cursor-pointer hover:bg-white/20 rounded-lg transition">
             ›
           </button>
         </div>
 
         {cargando && (
-          <div className="text-center p-6 text-sm">Cargando turnos...</div>
+          <div className="text-center py-12 text-sm animate-pulse">Cargando agenda...</div>
         )}
 
         {!cargando && error && (
-          <div className="bg-red-100 text-red-700 p-4 rounded-xl text-sm">
+          <div className="bg-red-100 text-red-700 p-4 rounded-xl text-sm shadow-md">
             {error}
             <button
               onClick={obtenerTurnos}
-              className="block mt-2 font-bold underline"
+              className="block mt-2 font-bold underline cursor-pointer"
             >
               Reintentar
             </button>
@@ -157,51 +200,60 @@ const AgendaVeterinarioPage = () => {
 
         {!cargando && !error && (
           <>
-            <p className="text-xs mb-2 opacity-90">
+            <p className="text-xs mb-3 font-medium bg-white/10 inline-block px-3 py-1 rounded-full">
               {turnosDelDia.length} turno(s) para este día
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-3 pb-8">
               {turnosDelDia.length === 0 ? (
-                <div className="bg-white/10 p-6 rounded-2xl text-center text-sm">
-                  No hay turnos para este día.
+                <div className="bg-white/10 p-6 rounded-2xl text-center text-sm font-medium">
+                  No hay turnos agendados para este día.
                 </div>
               ) : (
                 turnosDelDia.map((t, i) => (
                   <div
                     key={t.id_turno ?? i}
-                    className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-1.5"
+                    className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-2 relative"
                   >
-                    <div className="flex justify-between items-center border-b pb-1.5">
-                      <span className="font-bold text-[#129b9b] text-sm">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                      <span className="font-extrabold text-[#129b9b] text-[13px]">
                         {soloHora(t.fecha_hora_inicio)} - {soloHora(t.fecha_hora_fin)} hs
                       </span>
                       {t.estado && (
                         <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase ${colorEstado(t.estado)}`}
+                          className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wide ${colorEstado(t.estado)}`}
                         >
                           {t.estado}
                         </span>
                       )}
                     </div>
 
-                    {/* Mascota */}
-                    <p className="pt-1">
-                      <strong className="text-gray-900">Mascota:</strong>{' '}
-                      {t.nombre_mascota || (t.id_mascota ?? t.mascota_id ? `N° ${t.id_mascota ?? t.mascota_id}` : 'No especificada')}
-                    </p>
-
-                    {/* Dueño / Cliente */}
-                    <p>
-                      <strong className="text-gray-900">Dueño:</strong>{' '}
-                      {t.nombre_cliente || t.nombre_dueno || t.cliente || 'No asignado'}
-                    </p>
-
-                    {/* Motivo o Servicio (opcional si viene en el JSON) */}
-                    {(t.motivo || t.servicio) && (
-                      <p className="text-gray-500 text-[11px]">
-                        <strong>Detalle:</strong> {t.servicio || t.motivo}
+                    <div className="space-y-0.5 pt-1">
+                      <p>
+                        <strong className="text-gray-900 font-semibold">Mascota:</strong>{' '}
+                        {t.nombre_mascota || (t.id_mascota ?? t.mascota_id ? `N° ${t.id_mascota ?? t.mascota_id}` : 'No especificada')}
                       </p>
+                      <p>
+                        <strong className="text-gray-900 font-semibold">Dueño:</strong>{' '}
+                        {t.nombre_cliente || t.nombre_dueno || t.cliente || 'No asignado'}
+                      </p>
+                      {(t.motivo || t.servicio) && (
+                        <p className="text-gray-500 text-[11px] mt-1">
+                          <strong>Detalle:</strong> {t.servicio || t.motivo}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Mostrar botón solo si NO fue atendido/cancelado (opcional, si querés bloquear la re-edición) */}
+                    {t.estado !== 'atendido' && (
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          onClick={() => abrirModal(t)}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition text-[11px] cursor-pointer shadow-sm"
+                        >
+                          ✎ Gestionar
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))
@@ -210,6 +262,51 @@ const AgendaVeterinarioPage = () => {
           </>
         )}
       </div>
+
+      {/* Modal de Gestión de Turno */}
+      {turnoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in text-gray-800">
+            <h3 className="font-bold text-lg text-[#129b9b] mb-1">Gestionar Turno</h3>
+            <p className="text-xs text-gray-500 mb-4 pb-3 border-b">
+              Actualizando estado del turno de <strong>{turnoSeleccionado.nombre_mascota || `Mascota N°${turnoSeleccionado.mascota_id}`}</strong>
+            </p>
+
+            <form onSubmit={guardarCambioEstado}>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Estado de la atención
+              </label>
+              <select
+                value={nuevoEstado}
+                onChange={(e) => setNuevoEstado(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#129b9b]/50 mb-5 bg-gray-50 cursor-pointer"
+              >
+                <option value="programado">Programado</option>
+                <option value="atendido">Atendido / Realizado</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={cerrarModal}
+                  disabled={guardando}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={guardando}
+                  className="px-4 py-2 bg-[#129b9b] hover:bg-[#0d7373] text-white rounded-xl text-xs font-bold transition shadow-md disabled:opacity-50 cursor-pointer"
+                >
+                  {guardando ? 'Procesando...' : (nuevoEstado === 'atendido' ? 'Iniciar Consulta Médica ➔' : 'Confirmar Estado')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

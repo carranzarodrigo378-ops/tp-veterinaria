@@ -8,6 +8,7 @@ import LaboratorioPage from './pages/LaboratorioPage';
 import ReportesPage from './pages/ReportesPage';
 import AgendaVeterinaria from './pages/AgendaVeterinaria';
 import RegistroVeterinarioPage from './pages/RegistroVeterinarioPage';
+import RegistroConsultaPage from './pages/RegistroConsultaPage'; // (Ajustá la ruta según tu carpeta)
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/registro-veterinario" element={<RegistroVeterinarioPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/consulta/nueva" element={<RegistroConsultaPage />} />
       </Routes>
     </BrowserRouter>
   );

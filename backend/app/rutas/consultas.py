@@ -76,3 +76,11 @@ def emitir_orden_derivacion(datos: OrdenDerivacionCrear):
 )
 def listar_ordenes_derivacion():
     return servicio_consultas.listar_ordenes()
+
+@router.get(
+    "/tipos-analisis",
+    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
+)
+def obtener_tipos_analisis():
+    """Devuelve la lista de análisis disponibles en el laboratorio central."""
+    return servicio_consultas.listar_tipos_analisis()
