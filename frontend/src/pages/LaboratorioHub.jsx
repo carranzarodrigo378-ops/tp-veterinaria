@@ -5,13 +5,17 @@ const LaboratorioHub = () => {
   const navigate = useNavigate();
   const role = localStorage.getItem('role') || 'cliente';
 
-  useEffect(() => {
-    // Control de expiración de token de 10 min
-    const expiration = localStorage.getItem('token_expiration');
-    if (!expiration || Date.now() > parseInt(expiration, 10) || role !== 'veterinario') {
-      navigate('/login');
-    }
-  }, [role, navigate]);
+useEffect(() => {
+  // Control de expiración de token de 10 min y de rol
+  const expiration = localStorage.getItem('token_expiration');
+  if (
+    !expiration ||
+    Date.now() > parseInt(expiration, 10) ||
+    !['veterinario', 'admin'].includes(role)
+  ) {
+    navigate('/login');
+  }
+}, [role, navigate]);
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
