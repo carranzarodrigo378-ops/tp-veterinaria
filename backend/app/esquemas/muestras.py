@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from app.esquemas.enums import EstadoMuestra, EstadoPrecinto  
+from app.esquemas.enums import EstadoMuestra, EstadoPrecinto
 
 class MuestraBase(BaseModel):
     orden_derivacion_id: int
@@ -38,8 +38,8 @@ class HistorialEstadoMuestraCrear(HistorialEstadoMuestraBase):
     pass
 
 class HistorialEstadoMuestraRespuesta(HistorialEstadoMuestraBase):
-    id_historial_estado_muestra: int    
-    
+    id_historial_estado_muestra: int
+
 class MuestraRecepcion(BaseModel):
     estado_precinto: EstadoPrecinto
     temperatura_recepcion_c: float | None = None
@@ -56,5 +56,17 @@ class MuestraDetalleRespuesta(BaseModel):
     remito_id: int | None = None
     codigo: str
     tipo: str | None = None
-    fecha_extraccion: str
+    fecha_extraccion: str | None = None
     estado_actual: str
+    historial_trazabilidad: list[str] = []
+
+    # Datos para la tarjeta del front
+    paciente: str | None = None
+    id_cliente: int | None = None
+    nombre_cliente: str | None = None
+    analisis: str | None = None
+    clinica_origen: str | None = None
+    nro_remito: str | None = None
+    nro_precinto: str | None = None
+    estado_precinto: str | None = None
+    resultado: str | None = None
