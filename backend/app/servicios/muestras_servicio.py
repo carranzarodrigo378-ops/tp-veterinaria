@@ -17,28 +17,28 @@ class ServicioMuestras:
         self.historial_dao = historial_dao or HistorialMuestraDAO()
         self.db = DatabaseSingleton()
 
-    def _asegurar_conservadora_por_defecto(self, conn, id_conservadora: int = 1) -> int:
+    def _asegurar_contenedor_por_defecto(self, conn, id_contenedor: int = 1) -> int:
         """
-        Garantiza que exista al menos una conservadora isotérmica en la BD
-        para no fallar por Foreign Key al generar un remito biológico (Proceso 4).
+        Garantiza que exista al menos un contenedor isotérmico en la tabla 'contenedores'
+        para cumplir la Foreign Key de remitos_biologicos.
         """
         fila = conn.execute(
-            "SELECT id_conservadora FROM conservadoras WHERE id_conservadora = ?",
-            (id_conservadora,),
+            "SELECT id_contenedor FROM contenedores WHERE id_contenedor = ?",
+            (id_contenedor,),
         ).fetchone()
         if fila:
-            return fila["id_conservadora"]
+            return fila["id_contenedor"]
 
         primera = conn.execute(
-            "SELECT id_conservadora FROM conservadoras LIMIT 1"
+            "SELECT id_contenedor FROM contenedores LIMIT 1"
         ).fetchone()
         if primera:
-            return primera["id_conservadora"]
+            return primera["id_contenedor"]
 
         cursor = conn.execute(
             """
-            INSERT INTO conservadoras (codigo, capacidad, temperatura_objetivo_c, estado)
-            VALUES ('CONS-ISO-01', 20, 4.0, 'disponible')
+            INSERT INTO contenedores (codigo, capacidad_muestras, temperatura_objetivo_c, estado)
+            VALUES ('CONT-ISO-01', 20, 4.0, 'disponible')
             """
         )
         conn.commit()
@@ -47,7 +47,7 @@ class ServicioMuestras:
     def _mapear_a_respuesta(self, muestra: dict) -> dict:
         conn = self.db.get_conexion()
 
-        # 1. Historial de estados inmutable (texto y estructurado)
+        # 1. Historial de estados inmutable
         cursor_hist = conn.execute(
             """
             SELECT id_historial_estado_muestra, estado, fecha_hora, usuario, observaciones
@@ -65,7 +65,7 @@ class ServicioMuestras:
             for f in filas_hist
         ]
 
-        # 2. Datos cruzados: muestra -> orden -> consulta -> historia -> mascota + remito + precinto + resultado
+        # 2. Datos cruzados con remitos_biologicos, precintos y resultados_analisis
         cursor = conn.execute(
             """
             SELECT ma.nombre AS paciente,
@@ -124,7 +124,6 @@ class ServicioMuestras:
 
         conn = self.db.get_conexion()
 
-        # Validar que la orden de derivación exista
         orden = conn.execute(
             "SELECT id_orden_derivacion FROM ordenes_derivacion WHERE id_orden_derivacion = ?",
             (datos["orden_derivacion_id"],),
@@ -144,7 +143,6 @@ class ServicioMuestras:
         conn.commit()
         id_muestra = cursor.lastrowid
 
-        # Insertar hito inicial en el historial inmutable
         conn.execute(
             """
             INSERT INTO historial_estado_muestras (muestra_id, estado, fecha_hora, usuario, observaciones)
@@ -157,7 +155,7 @@ class ServicioMuestras:
         return self.obtener_por_id(id_muestra)
 
     # ------------------------------------------------------------------
-    # Proceso 4: Empaquetar en conservadora generando Remito y Precinto
+    # Proceso 4: Empaquetar en contenedor generando Remito y Precinto
     # ------------------------------------------------------------------
     def empaquetar(
         self, id_muestra: int, datos_empaquetar=None, usuario: str | None = None
@@ -169,7 +167,7 @@ class ServicioMuestras:
         )
         usuario_registro = usuario or datos.get("usuario") or "Veterinario"
 
-        # 1. Validar y ejecutar transición de estado ('extraida' -> 'empaquetada')
+        # 1. Cambiar estado ('extraida' -> 'empaquetada')
         self.muestra_dao.cambiar_estado(
             id_muestra, nuevo_estado="empaquetada", usuario=usuario_registro
         )
@@ -177,10 +175,10 @@ class ServicioMuestras:
         conn = self.db.get_conexion()
         muestra = self.muestra_dao.obtener_por_id(id_muestra)
 
-        # 2. Si aún no tiene remito biológico asociado, creamos Precinto + Conservadora + Remito
+        # 2. Crear Precinto + Contenedor + Remito Biológico según schema.sql
         remito_id = datos.get("remito_id") or muestra.get("remito_id")
         if not remito_id:
-            ts = datetime.now().strftime("%Y%m%d%H%M")
+            ts = datetime.now().strftime("%Y%m%d%H%M%S")
             codigo_precinto = (
                 datos.get("codigo_precinto")
                 or datos.get("nro_precinto")
@@ -192,7 +190,6 @@ class ServicioMuestras:
                 or f"REM-{id_muestra:04d}-{ts[-4:]}"
             )
 
-            # Obtener clínica de origen y laboratorio destino desde la orden de derivación
             info_orden = conn.execute(
                 """
                 SELECT c.clinica_id, od.id_laboratorio
@@ -206,11 +203,11 @@ class ServicioMuestras:
 
             clinica_origen_id = info_orden["clinica_id"] if info_orden else 1
             laboratorio_id = info_orden["id_laboratorio"] if info_orden else 1
-            conservadora_id = self._asegurar_conservadora_por_defecto(
-                conn, int(datos.get("conservadora_id") or 1)
+            contenedor_id = self._asegurar_contenedor_por_defecto(
+                conn, int(datos.get("contenedor_id") or datos.get("conservadora_id") or 1)
             )
 
-            # Crear Precinto Sanitario intacto
+            # Insertar Precinto Sanitario intacto
             cur_prec = conn.execute(
                 """
                 INSERT INTO precintos (codigo, estado, fecha_colocacion)
@@ -220,26 +217,31 @@ class ServicioMuestras:
             )
             precinto_id = cur_prec.lastrowid
 
-            # Crear Remito Biológico
+            # Insertar Remito Biológico (usando contenedor_id y fecha_emision de schema.sql)
             cur_rem = conn.execute(
                 """
                 INSERT INTO remitos_biologicos (
                     numero_remito, clinica_origen_id, laboratorio_destino_id,
-                    conservadora_id, precinto_id, estado
+                    contenedor_id, precinto_id, fecha_emision, estado
                 )
-                VALUES (?, ?, ?, ?, ?, 'armado')
+                VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'), 'precintado')
                 """,
                 (
                     numero_remito,
                     clinica_origen_id,
                     laboratorio_id,
-                    conservadora_id,
+                    contenedor_id,
                     precinto_id,
                 ),
             )
             remito_id = cur_rem.lastrowid
 
-        # Asociar la muestra al remito biológico
+            # Marcar contenedor como en_uso
+            conn.execute(
+                "UPDATE contenedores SET estado = 'en_uso' WHERE id_contenedor = ?",
+                (contenedor_id,),
+            )
+
         conn.execute(
             "UPDATE muestras SET remito_id = ? WHERE id_muestra = ?",
             (remito_id, id_muestra),
@@ -265,24 +267,29 @@ class ServicioMuestras:
             or "Transportista"
         )
 
-        # 1. Transición de estado ('empaquetada' -> 'en_transito')
+        # 1. Cambiar estado ('empaquetada' -> 'en_transito')
         self.muestra_dao.cambiar_estado(
             id_muestra, nuevo_estado="en_transito", usuario=responsable
         )
 
-        # 2. Actualizar el estado del remito biológico a 'en_transito'
+        # 2. Actualizar remito a 'en_transito' y registrar en 'eventos_envio'
         conn = self.db.get_conexion()
         muestra = self.muestra_dao.obtener_por_id(id_muestra)
         if muestra and muestra.get("remito_id"):
             conn.execute(
                 """
                 UPDATE remitos_biologicos
-                SET estado = 'en_transito',
-                    fecha_despacho = datetime('now', 'localtime'),
-                    responsable_transporte = ?
+                SET estado = 'en_transito'
                 WHERE id_remito_biologico = ?
                 """,
-                (responsable, muestra["remito_id"]),
+                (muestra["remito_id"],),
+            )
+            conn.execute(
+                """
+                INSERT INTO eventos_envio (remito_biologico_id, tipo, fecha_hora, responsable, observaciones)
+                VALUES (?, 'despachado', datetime('now', 'localtime'), ?, 'Despacho hacia Laboratorio Central')
+                """,
+                (muestra["remito_id"], responsable),
             )
             conn.commit()
 
@@ -302,9 +309,13 @@ class ServicioMuestras:
         estado_precinto = str(
             getattr(datos["estado_precinto"], "value", datos["estado_precinto"])
         ).lower()
-        recibido_por = datos.get("recibido_por") or usuario or "Bioquímico"
+        if estado_precinto not in ("intacto", "roto"):
+            estado_precinto = "roto"
 
-        # 1. MuestraDAO verifica el precinto: si está 'roto' o 'violado', pasa a 'rechazada'
+        recibido_por = datos.get("recibido_por") or usuario or "Laboratorio Central"
+        temperatura = datos.get("temperatura_recepcion_c") or 4.0
+
+        # 1. MuestraDAO verifica el precinto: si está 'roto', pasa la muestra a 'rechazada'
         self.muestra_dao.cambiar_estado(
             id_muestra,
             nuevo_estado="recibida",
@@ -312,25 +323,18 @@ class ServicioMuestras:
             usuario=recibido_por,
         )
 
-        # 2. Reflejar el estado del precinto y la recepción en remitos_biologicos y precintos
+        # 2. Actualizar remitos_biologicos, precintos y recepciones_lab
         conn = self.db.get_conexion()
         muestra = self.muestra_dao.obtener_por_id(id_muestra)
         if muestra and muestra.get("remito_id"):
             remito = conn.execute(
-                "SELECT precinto_id FROM remitos_biologicos WHERE id_remito_biologico = ?",
+                "SELECT precinto_id, contenedor_id FROM remitos_biologicos WHERE id_remito_biologico = ?",
                 (muestra["remito_id"],),
             ).fetchone()
 
-            estado_remito = (
-                "rechazado" if estado_precinto in ("roto", "violado") else "recibido"
-            )
+            estado_remito = "rechazado" if estado_precinto == "roto" else "recibido"
             conn.execute(
-                """
-                UPDATE remitos_biologicos
-                SET estado = ?,
-                    fecha_recepcion = datetime('now', 'localtime')
-                WHERE id_remito_biologico = ?
-                """,
+                "UPDATE remitos_biologicos SET estado = ? WHERE id_remito_biologico = ?",
                 (estado_remito, muestra["remito_id"]),
             )
 
@@ -339,6 +343,30 @@ class ServicioMuestras:
                     "UPDATE precintos SET estado = ? WHERE id_precinto = ?",
                     (estado_precinto, remito["precinto_id"]),
                 )
+
+            if remito and remito["contenedor_id"]:
+                conn.execute(
+                    "UPDATE contenedores SET estado = 'disponible' WHERE id_contenedor = ?",
+                    (remito["contenedor_id"],),
+                )
+
+            # Registrar la recepción en recepciones_lab (IGNORE por si el remito tenía varias muestras)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO recepciones_lab (
+                    remito_biologico_id, fecha_hora, recibido_por,
+                    estado_precinto, temperatura_recepcion_c, observaciones
+                )
+                VALUES (?, datetime('now', 'localtime'), ?, ?, ?, ?)
+                """,
+                (
+                    muestra["remito_id"],
+                    recibido_por,
+                    estado_precinto,
+                    temperatura,
+                    datos.get("observaciones") or f"Precinto verificado: {estado_precinto}",
+                ),
+            )
             conn.commit()
 
         return self.obtener_por_id(id_muestra)
@@ -354,9 +382,8 @@ class ServicioMuestras:
             if isinstance(datos_analisis, dict)
             else datos_analisis.model_dump()
         )
-        validado_por = datos.get("validado_por") or usuario or "Bioquímico"
+        validado_por = datos.get("validado_por") or usuario or "Laboratorio Central"
 
-        # Transición ('recibida' -> 'analizada'); falla si estaba 'rechazada' por precinto roto
         self.muestra_dao.cambiar_estado(
             id_muestra,
             nuevo_estado="analizada",
@@ -366,7 +393,7 @@ class ServicioMuestras:
         conn = self.db.get_conexion()
         conn.execute(
             """
-            INSERT INTO resultados_analisis (muestra_id, fecha_resultado, resultado, validado_por)
+            INSERT OR REPLACE INTO resultados_analisis (muestra_id, fecha_resultado, resultado, validado_por)
             VALUES (?, datetime('now', 'localtime'), ?, ?)
             """,
             (id_muestra, datos["resultado"], validado_por),
@@ -383,15 +410,17 @@ class ServicioMuestras:
             raise KeyError(f"No existe la muestra con ID {id_muestra}")
         return self._mapear_a_respuesta(muestra)
 
-    def listar_todas(self) -> list[dict]:
+    def listar_todas(self, rol: str | None = None) -> list[dict]:
         muestras = self.muestra_dao.obtener_todos(limite=500)
-        return [self._mapear_a_respuesta(m) for m in muestras]
+        mapeadas = [self._mapear_a_respuesta(m) for m in muestras]
+        if rol == "laboratorio":
+            estados_visibles_lab = {"en_transito", "recibida", "analizada", "rechazada"}
+            return [
+                m for m in mapeadas if m["estado_actual"] in estados_visibles_lab
+            ]
+        return mapeadas
 
     def obtener_trazabilidad_detallada(self, id_muestra: int) -> dict:
-        """
-        Devuelve la ficha completa de la muestra junto con la línea de tiempo
-        estructurada de todos sus cambios de estado inmutables.
-        """
         detalle = self.obtener_por_id(id_muestra)
         conn = self.db.get_conexion()
         pasos = conn.execute(
@@ -432,9 +461,9 @@ class ServicioMuestras:
                 r.id_remito_biologico,
                 r.numero_remito,
                 r.estado AS estado_remito,
-                r.fecha_despacho,
-                r.fecha_recepcion,
-                r.responsable_transporte,
+                r.fecha_emision,
+                rl.fecha_hora AS fecha_recepcion,
+                rl.recibido_por,
                 cl.nombre AS clinica_origen,
                 l.nombre AS laboratorio_destino,
                 p.codigo AS codigo_precinto,
@@ -445,7 +474,8 @@ class ServicioMuestras:
             LEFT JOIN clinicas cl ON cl.id_clinica = r.clinica_origen_id
             LEFT JOIN laboratorios l ON l.id_laboratorio = r.laboratorio_destino_id
             LEFT JOIN precintos p ON p.id_precinto = r.precinto_id
-            LEFT JOIN conservadoras c ON c.id_conservadora = r.conservadora_id
+            LEFT JOIN contenedores c ON c.id_contenedor = r.contenedor_id
+            LEFT JOIN recepciones_lab rl ON rl.remito_biologico_id = r.id_remito_biologico
             LEFT JOIN muestras m ON m.remito_id = r.id_remito_biologico
             GROUP BY r.id_remito_biologico
             ORDER BY r.id_remito_biologico DESC

@@ -157,19 +157,21 @@ def listar_turnos(
     """
     return servicio_turnos.listar_turnos()
 
+
 @router.post("/turnos", status_code=status.HTTP_201_CREATED)
 def programar_turno(
     datos: TurnoPeticion,
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        # Acá le agregamos motivo=datos.motivo y servicio=datos.servicio
+        # El cliente no necesita elegir veterinario; si no viene, pasa como None
+        id_vet = getattr(datos, "id_veterinario", None)
         turno_creado = servicio_turnos.agendar_turno(
-            id_veterinario=datos.id_veterinario,
+            id_veterinario=id_vet,
             id_mascota=datos.id_mascota,
             fecha_hora=datos.fecha_hora,
             motivo=datos.motivo,
-            servicio=datos.servicio
+            servicio=datos.servicio,
         )
         return turno_creado
     except ValueError as e:
@@ -178,31 +180,84 @@ def programar_turno(
             detail=str(e),
         )
 
+
 @router.patch("/turnos/{id_turno}/estado")
 def cambiar_estado_turno(
     id_turno: int,
     datos: TurnoEstadoActualizar,
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
-    # NOTA: Para mantener la limpieza, te sugiero en el futuro mover 
-    # este UPDATE de SQL que pasaste en tu versión anterior también al servicio_turnos. 
-    # Por ahora se deja interactuando con el DAO o servicio si lo configuraste ahí.
+    """
+    Actualiza el estado del turno. Si pasa a 'atendido', asigna automáticamente
+    como veterinario actuante al usuario que tiene la sesión iniciada.
+    """
     conn = DatabaseSingleton().get_conexion()
-    cursor = conn.execute(
-        "UPDATE turnos SET estado = ? WHERE id_turno = ?",
-        (datos.estado.value, id_turno),
-    )
-    conn.commit()
-    if cursor.rowcount == 0:
+    cursor = conn.cursor()
+
+    turno = cursor.execute(
+        "SELECT id_turno, veterinario_id FROM turnos WHERE id_turno = ?",
+        (id_turno,),
+    ).fetchone()
+    if not turno:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No existe el turno con ID {id_turno}",
         )
+
+    id_vet_asignado = turno["veterinario_id"]
+    nuevo_estado = getattr(datos.estado, "value", str(datos.estado))
+
+    nombre_usuario = (
+        usuario_actual.get("usuario")
+        or usuario_actual.get("sub")
+        or usuario_actual.get("username")
+        or usuario_actual.get("nombre_usuario")
+    )
+
+    # Si el turno se marca como 'atendido', registramos qué veterinario lo atendió
+    if nuevo_estado == "atendido":
+        id_vet_sesion = usuario_actual.get("id_veterinario") or usuario_actual.get("veterinario_id")
+        if id_vet_sesion:
+            id_vet_asignado = id_vet_sesion
+        elif nombre_usuario:
+            fila_usr = cursor.execute(
+                "SELECT id_veterinario, matricula FROM usuarios WHERE usuario = ?",
+                (nombre_usuario,),
+            ).fetchone()
+            if fila_usr and fila_usr["id_veterinario"]:
+                id_vet_asignado = fila_usr["id_veterinario"]
+            elif fila_usr and fila_usr["matricula"]:
+                fila_vet = cursor.execute(
+                    "SELECT id_veterinario FROM veterinarios WHERE matricula = ?",
+                    (fila_usr["matricula"],),
+                ).fetchone()
+                if fila_vet:
+                    id_vet_asignado = fila_vet["id_veterinario"]
+
+    cursor.execute(
+        "UPDATE turnos SET estado = ?, veterinario_id = ? WHERE id_turno = ?",
+        (nuevo_estado, id_vet_asignado, id_turno),
+    )
+    conn.commit()
+
+    vet_nombre = None
+    if id_vet_asignado:
+        fila_nombre = cursor.execute(
+            "SELECT nombre || ' ' || apellido AS nombre_completo FROM veterinarios WHERE id_veterinario = ?",
+            (id_vet_asignado,),
+        ).fetchone()
+        if fila_nombre:
+            vet_nombre = fila_nombre["nombre_completo"]
+
     return {
         "mensaje": "Estado del turno actualizado",
         "id_turno": id_turno,
-        "estado": datos.estado.value,
+        "estado": nuevo_estado,
+        "id_veterinario": id_vet_asignado,
+        "atendido_por": vet_nombre or nombre_usuario,
     }
+
+
 @router.get("/turnos/agenda")
 def obtener_agenda(
     usuario_actual: dict = Depends(obtener_usuario_actual),
@@ -224,7 +279,7 @@ def obtener_agenda(
         if not nombre_usuario:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"No se pudo identificar el usuario en la sesión: {usuario_actual}"
+                detail=f"No se pudo identificar el usuario en la sesión: {usuario_actual}",
             )
 
         return servicio_turnos.obtener_agenda_veterinario(nombre_usuario=nombre_usuario)

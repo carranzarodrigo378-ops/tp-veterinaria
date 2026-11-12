@@ -262,17 +262,18 @@ class ReportesDAO(BaseDAO):
             """
             SELECT
                 t.id_turno,
-                t.fecha_hora,
+                t.fecha_hora_inicio AS fecha_hora,
+                t.fecha_hora_fin,
                 t.estado,
-                t.motivo,
+                COALESCE(t.motivo, t.servicio, 'Consulta general') AS motivo,
                 m.nombre AS mascota,
                 COALESCE(v.nombre || ' ' || v.apellido, 'Sin asignar (Guardia)') AS veterinario,
-                cl.nombre AS clinica
+                COALESCE(cl.nombre, 'Clínica Central') AS clinica
             FROM turnos t
             JOIN mascotas m          ON t.mascota_id = m.id_mascota
             LEFT JOIN veterinarios v ON t.veterinario_id = v.id_veterinario
-            JOIN clinicas cl         ON t.clinica_id = cl.id_clinica
-            ORDER BY t.fecha_hora DESC
+            LEFT JOIN clinicas cl    ON v.clinica_id = cl.id_clinica
+            ORDER BY t.fecha_hora_inicio DESC
             """
         )
 
@@ -280,7 +281,6 @@ class ReportesDAO(BaseDAO):
             "resumen_estados": resumen,
             "detalle_turnos": detalle,
         }
-
     # ------------------------------------------------------------------
     # 8. GET /demografia-mascotas
     # ------------------------------------------------------------------

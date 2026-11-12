@@ -14,6 +14,10 @@ from app.rutas.dependencias import requerir_rol, obtener_usuario_actual
 router = APIRouter(prefix="/api/muestras", tags=["Muestras y Laboratorio"])
 
 
+# =========================================================================
+# 1. ETAPA CLÍNICA: EXTRACCIÓN, EMPAQUETADO Y ENVÍO (VETERINARIO Y ADMIN)
+# =========================================================================
+
 @router.post(
     "/",
     response_model=MuestraDetalleRespuesta,
@@ -73,16 +77,24 @@ def despachar_muestra(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
+# =========================================================================
+# 2. ETAPA LABORATORIO CENTRAL: RECEPCIÓN, CONTROL DE PRECINTO Y ANÁLISIS
+# =========================================================================
+
 @router.post(
     "/{id_muestra}/recibir",
     response_model=MuestraDetalleRespuesta,
-    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
+    dependencies=[Depends(requerir_rol(["laboratorio"]))],
 )
 def recibir_muestra_en_laboratorio(
     id_muestra: int,
     datos: MuestraRecepcion,
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
+    """
+    El usuario con rol 'laboratorio' recibe la muestra que estaba 'en_transito'.
+    Si marca estado_precinto = 'roto', el sistema la rechaza automáticamente.
+    """
     try:
         username = usuario_actual.get("sub") or usuario_actual.get("usuario")
         return servicio_muestras.recibir_en_laboratorio(id_muestra, datos, usuario=username)
@@ -97,13 +109,17 @@ def recibir_muestra_en_laboratorio(
 @router.post(
     "/{id_muestra}/analizar",
     response_model=MuestraDetalleRespuesta,
-    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
+    dependencies=[Depends(requerir_rol(["laboratorio"]))],
 )
 def registrar_analisis_muestra(
     id_muestra: int,
     datos: MuestraAnalizar,
     usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
+    """
+    El usuario con rol 'laboratorio' carga el resultado del estudio y lo envía
+    de vuelta a la clínica, pasando la muestra a estado 'analizada'.
+    """
     try:
         username = usuario_actual.get("sub") or usuario_actual.get("usuario")
         return servicio_muestras.registrar_analisis(id_muestra, datos, usuario=username)
@@ -114,6 +130,10 @@ def registrar_analisis_muestra(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
+
+# =========================================================================
+# 3. CONSULTAS Y SEGUIMIENTO DE TRAZABILIDAD (CLÍNICA Y LABORATORIO)
+# =========================================================================
 
 @router.get(
     "/remitos/listado",
@@ -156,7 +176,7 @@ def obtener_muestra(id_muestra: int):
 @router.get(
     "/",
     response_model=list[MuestraDetalleRespuesta],
-    dependencies=[Depends(obtener_usuario_actual)],
 )
-def listar_muestras():
-    return servicio_muestras.listar_todas()
+def listar_muestras(usuario_actual: dict = Depends(obtener_usuario_actual)):
+    rol = usuario_actual.get("rol")
+    return servicio_muestras.listar_todas(rol=rol)
