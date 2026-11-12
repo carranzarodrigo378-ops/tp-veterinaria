@@ -199,13 +199,8 @@ const HomeMenu = () => {
                 <p className="text-sm font-bold leading-tight">{clientName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm ${roleBadge.color}`}>
-                    {roleBadge.label}
-                  </span>
-                  {clientId && (
-                    <span className="text-[10px] font-mono bg-white/15 px-1.5 py-0.5 rounded-sm text-cyan-100">
-                      #{clientId}
-                    </span>
-                  )}
+  {roleBadge.label}
+</span>
                 </div>
               </div>
             </div>
