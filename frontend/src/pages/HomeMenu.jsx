@@ -108,7 +108,6 @@ const HomeMenu = () => {
         description: 'Ingreso de muestras biológicas y seguimiento de análisis',
         icon: icons.lab,
         path: '/laboratorio-hub',
-  
       },
       {
         id: 'reportes-vete',
@@ -135,7 +134,7 @@ const HomeMenu = () => {
         title: 'Calendario de Turnos',
         description: 'Supervisión de agendas, guardias y reasignaciones activas',
         icon: icons.calendar,
-        path: '/turnos',
+        path: '/agenda',
       },
       {
         id: 'pacientes-admin',
@@ -148,7 +147,7 @@ const HomeMenu = () => {
       {
         id: 'lab-admin',
         tag: 'Servicios',
-        title: 'MUestras biológicas',
+        title: 'Muestras biológicas',
         description: 'Monitoreo de órdenes, derivaciones y entregas de resultados',
         icon: icons.lab,
         path: '/laboratorio-hub',
@@ -228,7 +227,7 @@ const HomeMenu = () => {
       {/* Contenedor Principal */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 flex flex-col lg:flex-row gap-8 items-stretch relative z-10">
         
-        {/* Columna Izquierda: Opciones rediseñadas con estilo profesional, sobrio y orgánico */}
+        {/* Columna Izquierda */}
         <section className="w-full lg:w-1/2 bg-white/95 backdrop-blur-md rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200/90 flex flex-col justify-between">
           <div className="flex-1 flex flex-col">
             <div className="mb-5 pb-3 border-b border-slate-100">
@@ -305,9 +304,8 @@ const HomeMenu = () => {
           </div>
         </section>
 
-        {/* Columna Derecha: Tarjeta Hero Original con gradiente y frescura */}
+        {/* Columna Derecha: Tarjeta Hero Original */}
         <section className="w-full lg:w-1/2 bg-gradient-to-br from-[#0d7373] via-[#129b9b] to-[#1bb3b3] rounded-3xl p-8 md:p-12 text-white flex flex-col justify-between shadow-xl relative overflow-hidden">
-          
           <div className="absolute -top-12 -right-12 text-[180px] text-white/5 select-none pointer-events-none">
             🐾
           </div>
