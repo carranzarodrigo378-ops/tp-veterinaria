@@ -14,6 +14,10 @@ const PetsPage = () => {
   // Estados principales
   const [mascotas, setMascotas] = useState([]);
   const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
+  
+  // NUEVO: Estados para la Historia Clínica
+  const [historiaClinica, setHistoriaClinica] = useState([]);
+  const [cargandoHistoria, setCargandoHistoria] = useState(false);
 
   // Estado para el buscador
   const [busqueda, setBusqueda] = useState('');
@@ -22,10 +26,9 @@ const PetsPage = () => {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
 
-  // Modal de registro (si venimos redirigidos de turnos, se abre por defecto)
+  // Modal de registro
   const [mostrarModal, setMostrarModal] = useState(location.state?.returnToTurnos || false);
 
-  // Formulario en español, igual que FastAPI
   const [nuevaMascota, setNuevaMascota] = useState({
     nombre: '',
     especie: 'Perro',
@@ -33,7 +36,6 @@ const PetsPage = () => {
     sexo: 'macho',
     fecha_nacimiento: ''
   });
-
 
   // Función para realizar peticiones HTTP
   const realizarPeticion = async (url, opciones = {}) => {
@@ -55,14 +57,12 @@ const PetsPage = () => {
 
     if (!response.ok) {
       let mensaje = `Error HTTP ${response.status}`;
-
       try {
         const datosError = await response.json();
         mensaje = datosError.detail || mensaje;
       } catch {
         // Mantener el mensaje HTTP
       }
-
       throw new Error(mensaje);
     }
 
@@ -73,7 +73,6 @@ const PetsPage = () => {
     return response.json();
   };
 
-  // Obtener mascotas según el rol (Cliente o Veterinario/Admin)
   const obtenerMascotas = useCallback(async () => {
     try {
       setCargando(true);
@@ -105,20 +104,14 @@ const PetsPage = () => {
     }
   }, [idCliente, rol]);
 
-  // Cargar mascotas al ingresar a la pantalla
   useEffect(() => {
     obtenerMascotas();
   }, [obtenerMascotas]);
 
-  // Registrar mascota
   const handleCrearMascota = async (e) => {
     e.preventDefault();
 
-    if (
-      !nuevaMascota.nombre.trim() ||
-      !nuevaMascota.raza.trim() ||
-      !nuevaMascota.fecha_nacimiento
-    ) {
+    if (!nuevaMascota.nombre.trim() || !nuevaMascota.raza.trim() || !nuevaMascota.fecha_nacimiento) {
       alert('Completá todos los campos obligatorios.');
       return;
     }
@@ -128,7 +121,6 @@ const PetsPage = () => {
       return;
     }
 
-    // JSON enviado a FastAPI
     const datosMascota = {
       nombre: nuevaMascota.nombre.trim(),
       especie: nuevaMascota.especie,
@@ -141,15 +133,10 @@ const PetsPage = () => {
     try {
       setGuardando(true);
 
-      const mascotaCreada = await realizarPeticion(
-        `${API_URL}/mascotas`,
-        {
-          method: 'POST',
-          body: JSON.stringify(datosMascota)
-        }
-      );
-
-      console.log('Mascota registrada:', mascotaCreada);
+      const mascotaCreada = await realizarPeticion(`${API_URL}/mascotas`, {
+        method: 'POST',
+        body: JSON.stringify(datosMascota)
+      });
 
       if (location.state?.returnToTurnos) {
         const idMascotaId = mascotaCreada?.id_mascota || mascotaCreada?.id;
@@ -159,62 +146,70 @@ const PetsPage = () => {
 
       await obtenerMascotas();
       setMostrarModal(false);
-      setNuevaMascota({
-        nombre: '',
-        especie: 'Perro',
-        raza: '',
-        sexo: 'macho',
-        fecha_nacimiento: ''
-      });
-
+      setNuevaMascota({ nombre: '', especie: 'Perro', raza: '', sexo: 'macho', fecha_nacimiento: '' });
       alert('¡Mascota registrada correctamente!');
 
     } catch (err) {
-      console.error('Error al registrar mascota:', err);
       alert(`No se pudo registrar la mascota: ${err.message}`);
     } finally {
       setGuardando(false);
     }
   };
 
-  // Consultar una mascota específica
+  // MODIFICADO: Ahora también busca el historial de turnos
   const consultarMascota = async (idMascota) => {
     try {
-      const datos = await realizarPeticion(
-        `${API_URL}/mascotas/${idMascota}`
-      );
+      // 1. Traer datos básicos de la mascota
+      const datos = await realizarPeticion(`${API_URL}/mascotas/${idMascota}`);
       setMascotaSeleccionada(datos);
+
+      // 2. Traer el historial clínico (Turnos)
+      setCargandoHistoria(true);
+      const todosLosTurnos = await realizarPeticion(`${API_URL}/turnos`);
+      
+      // Filtramos los turnos de esta mascota y los ordenamos del más nuevo al más viejo
+      const turnosMascota = todosLosTurnos
+        .filter(t => (t.id_mascota === idMascota || t.mascota_id === idMascota))
+        .sort((a, b) => new Date(b.fecha_hora_inicio) - new Date(a.fecha_hora_inicio));
+
+      setHistoriaClinica(turnosMascota);
+
     } catch (err) {
-      console.error('Error al consultar mascota:', err);
+      console.error('Error al consultar mascota o su historial:', err);
       alert(err.message);
+    } finally {
+      setCargandoHistoria(false);
     }
   };
 
-  // Calcular edad a partir de fecha de nacimiento
   const calcularEdad = (fechaNacimiento) => {
     if (!fechaNacimiento) return 'No registrada';
-
     const nacimiento = new Date(`${fechaNacimiento}T00:00:00`);
-
-    if (Number.isNaN(nacimiento.getTime())) {
-      return 'No disponible';
-    }
+    if (Number.isNaN(nacimiento.getTime())) return 'No disponible';
 
     const hoy = new Date();
     let edad = hoy.getFullYear() - nacimiento.getFullYear();
     const diferenciaMes = hoy.getMonth() - nacimiento.getMonth();
 
-    if (
-      diferenciaMes < 0 ||
-      (diferenciaMes === 0 && hoy.getDate() < nacimiento.getDate())
-    ) {
+    if (diferenciaMes < 0 || (diferenciaMes === 0 && hoy.getDate() < nacimiento.getDate())) {
       edad--;
     }
-
     return edad < 0 ? 'No disponible' : `${edad} años`;
   };
 
-  // Lógica de filtrado
+  const formatearFecha = (fechaIso) => {
+    if (!fechaIso) return '';
+    const fecha = new Date(fechaIso);
+    return fecha.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const colorEstado = (estado = '') => {
+    const e = String(estado).toLowerCase();
+    if (e.includes('cancel')) return 'bg-red-100 text-red-700';
+    if (e.includes('complet') || e.includes('atendid') || e.includes('realiz')) return 'bg-green-100 text-green-700';
+    return 'bg-yellow-100 text-yellow-700';
+  };
+
   const mascotasFiltradas = mascotas.filter((mascota) => {
     const texto = busqueda.toLowerCase();
     return (
@@ -223,7 +218,7 @@ const PetsPage = () => {
     );
   });
 
-  // Vista de detalle
+  // VISTA DE DETALLE MODIFICADA
   if (mascotaSeleccionada) {
     return (
       <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-4 relative">
@@ -231,50 +226,92 @@ const PetsPage = () => {
           className="fixed inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/logologin.jpg')" }}
         />
-        <div className="relative z-10 w-full max-w-md bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
+        {/* Contenedor principal con altura máxima y flex para permitir scroll interno */}
+        <div className="relative z-10 w-full max-w-md max-h-[90vh] flex flex-col bg-[#129b9b] rounded-3xl shadow-2xl p-5 text-white">
+          
           <button
             onClick={() => setMascotaSeleccionada(null)}
-            className="mb-5 font-semibold hover:underline cursor-pointer"
+            className="mb-4 font-semibold hover:underline cursor-pointer text-left w-fit"
           >
             ← Volver a mascotas
           </button>
 
-          <div className="bg-white text-gray-800 rounded-2xl p-5 shadow-md space-y-3">
-            <h2 className="text-xl font-bold text-[#129b9b] text-center">
-              {mascotaSeleccionada.nombre}
-            </h2>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">ID mascota:</span>
-              <strong>{mascotaSeleccionada.id_mascota}</strong>
+          {/* Área con Scroll para los datos y la historia */}
+          <div className="overflow-y-auto pr-1 space-y-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
+            
+            {/* Tarjeta 1: Datos Personales */}
+            <div className="bg-white text-gray-800 rounded-2xl p-5 shadow-md space-y-2">
+              <h2 className="text-xl font-extrabold text-[#129b9b] text-center mb-3">
+                {mascotaSeleccionada.nombre}
+              </h2>
+              <div className="border-b border-gray-100 pb-1.5 flex justify-between text-sm">
+                <span className="text-gray-500">ID mascota:</span>
+                <strong>#{mascotaSeleccionada.id_mascota}</strong>
+              </div>
+              <div className="border-b border-gray-100 pb-1.5 flex justify-between text-sm">
+                <span className="text-gray-500">Especie y Raza:</span>
+                <strong>{mascotaSeleccionada.especie} - {mascotaSeleccionada.raza}</strong>
+              </div>
+              <div className="border-b border-gray-100 pb-1.5 flex justify-between text-sm">
+                <span className="text-gray-500">Sexo:</span>
+                <strong className="capitalize">{mascotaSeleccionada.sexo}</strong>
+              </div>
+              <div className="border-b border-gray-100 pb-1.5 flex justify-between text-sm">
+                <span className="text-gray-500">Nacimiento:</span>
+                <strong>{mascotaSeleccionada.fecha_nacimiento}</strong>
+              </div>
+              <div className="border-b border-gray-100 pb-1.5 flex justify-between text-sm">
+                <span className="text-gray-500">Edad:</span>
+                <strong>{calcularEdad(mascotaSeleccionada.fecha_nacimiento)}</strong>
+              </div>
+              <div className="flex justify-between text-sm pt-1">
+                <span className="text-gray-500">Tutor (ID Cliente):</span>
+                <strong>#{mascotaSeleccionada.id_cliente}</strong>
+              </div>
             </div>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">Nombre:</span>
-              <strong>{mascotaSeleccionada.nombre}</strong>
+
+            {/* Tarjeta 2: Historia Clínica (Turnos) */}
+            <div className="bg-white text-gray-800 rounded-2xl p-5 shadow-md">
+              <h3 className="font-bold text-[#129b9b] border-b border-gray-200 pb-2 mb-3 flex items-center gap-2">
+                📋 Historia Clínica
+              </h3>
+              
+              {cargandoHistoria ? (
+                <div className="text-center text-sm text-gray-500 py-4 animate-pulse">
+                  Buscando registros médicos...
+                </div>
+              ) : historiaClinica.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 bg-gray-50 p-4 rounded-xl italic">
+                  Esta mascota no tiene turnos ni atenciones registradas.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historiaClinica.map((turno) => (
+                    <div key={turno.id_turno} className="bg-gray-50 border border-gray-100 p-3 rounded-xl text-xs relative">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-bold text-[#129b9b]">
+                          {formatearFecha(turno.fecha_hora_inicio)} hs
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${colorEstado(turno.estado)}`}>
+                          {turno.estado}
+                        </span>
+                      </div>
+                      
+                      <p className="mt-1.5">
+                        <strong className="text-gray-600">Motivo:</strong> {turno.motivo || turno.servicio || 'Consulta general'}
+                      </p>
+                      
+                      {turno.nombre_veterinario && (
+                        <p className="mt-0.5">
+                          <strong className="text-gray-600">Atendido por:</strong> {turno.nombre_veterinario}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">Especie:</span>
-              <strong>{mascotaSeleccionada.especie}</strong>
-            </div>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">Raza:</span>
-              <strong>{mascotaSeleccionada.raza}</strong>
-            </div>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">Sexo:</span>
-              <strong>{mascotaSeleccionada.sexo}</strong>
-            </div>
-            <div className="border-b pb-2 flex justify-between">
-              <span className="text-gray-500">Nacimiento:</span>
-              <strong>{mascotaSeleccionada.fecha_nacimiento}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Edad:</span>
-              <strong>{calcularEdad(mascotaSeleccionada.fecha_nacimiento)}</strong>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">ID cliente:</span>
-              <strong>{mascotaSeleccionada.id_cliente}</strong>
-            </div>
+
           </div>
         </div>
       </div>
@@ -356,8 +393,8 @@ const PetsPage = () => {
                     <p className="font-bold text-base">
                       {mascota.nombre}
                     </p>
-                    <p className="text-xs text-cyan-50">
-                      {mascota.especie} • {mascota.raza}
+                    <p className="text-xs text-cyan-50 capitalize">
+                      {mascota.especie} - {mascota.raza}
                     </p>
                     <p className="text-xs text-cyan-50 mt-1">
                       {calcularEdad(mascota.fecha_nacimiento)}
@@ -397,11 +434,8 @@ const PetsPage = () => {
                 Registrar Mascota
               </h3>
               <form onSubmit={handleCrearMascota} className="space-y-3">
-                {/* Nombre */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Nombre *
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Nombre *</label>
                   <input
                     type="text"
                     required
@@ -411,11 +445,8 @@ const PetsPage = () => {
                     placeholder="Ej: Nefer"
                   />
                 </div>
-                {/* Especie */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Especie *
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Especie *</label>
                   <select
                     required
                     value={nuevaMascota.especie}
@@ -429,11 +460,8 @@ const PetsPage = () => {
                     <option value="Otro">Otro 🐾</option>
                   </select>
                 </div>
-                {/* Raza */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Raza *
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Raza *</label>
                   <input
                     type="text"
                     required
@@ -443,11 +471,8 @@ const PetsPage = () => {
                     placeholder="Ej: Carey, Caniche"
                   />
                 </div>
-                {/* Sexo */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Sexo *
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Sexo *</label>
                   <select
                     required
                     value={nuevaMascota.sexo}
@@ -458,11 +483,8 @@ const PetsPage = () => {
                     <option value="hembra">Hembra</option>
                   </select>
                 </div>
-                {/* Fecha de nacimiento */}
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-1">
-                    Fecha de nacimiento *
-                  </label>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Fecha de nacimiento *</label>
                   <input
                     type="date"
                     required
@@ -472,7 +494,6 @@ const PetsPage = () => {
                     className="w-full border border-gray-200 p-2.5 rounded-xl"
                   />
                 </div>
-                {/* Botones */}
                 <div className="flex gap-2 pt-2">
                   <button
                     type="button"

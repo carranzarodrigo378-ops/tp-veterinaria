@@ -180,7 +180,7 @@ const ReportesPage = () => {
           type="button"
           onClick={() => descargarReporte('pdf', tipo)}
           disabled={descargando === `${tipo}-pdf`}
-          className="bg-[#0d7373] hover:bg-[#0a5c5c] disabled:opacity-60 text-white font-semibold px-3 py-1 rounded-lg text-[11px] transition shadow-sm flex items-center gap-1"
+          className="bg-[#0d7373] hover:bg-[#0a5c5c] disabled:opacity-60 text-white font-semibold px-3 py-1 rounded-lg text-[11px] transition shadow-sm flex items-center gap-1 cursor-pointer"
         >
           {descargando === `${tipo}-pdf` ? 'Generando...' : '📄 Descargar PDF'}
         </button>
@@ -188,7 +188,7 @@ const ReportesPage = () => {
           type="button"
           onClick={() => descargarReporte('csv', tipo)}
           disabled={descargando === `${tipo}-csv`}
-          className="bg-[#129b9b] hover:bg-[#0f8686] disabled:opacity-60 text-white font-semibold px-3 py-1 rounded-lg text-[11px] transition shadow-sm flex items-center gap-1"
+          className="bg-[#129b9b] hover:bg-[#0f8686] disabled:opacity-60 text-white font-semibold px-3 py-1 rounded-lg text-[11px] transition shadow-sm flex items-center gap-1 cursor-pointer"
         >
           {descargando === `${tipo}-csv` ? 'Generando...' : '📊 Exportar CSV'}
         </button>
@@ -217,7 +217,7 @@ const ReportesPage = () => {
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => navigate(-1)}
-            className="text-xs font-semibold bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-xl transition"
+            className="text-xs font-semibold bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-xl transition cursor-pointer"
           >
             ‹ Volver
           </button>
@@ -231,7 +231,7 @@ const ReportesPage = () => {
           </div>
           <button
             onClick={cargarTodosLosReportes}
-            className="text-xs bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-xl font-semibold transition"
+            className="text-xs bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-xl font-semibold transition cursor-pointer"
             title="Actualizar métricas"
           >
             ↻ Actualizar
@@ -369,21 +369,21 @@ const ReportesPage = () => {
                 <div className="col-span-2 sm:col-span-4 flex flex-wrap gap-1.5 pt-1">
                   <button
                     type="submit"
-                    className="bg-[#129b9b] text-white px-3.5 py-1.5 rounded-lg font-semibold hover:bg-[#0d7373] transition"
+                    className="bg-[#129b9b] text-white px-3.5 py-1.5 rounded-lg font-semibold hover:bg-[#0d7373] transition cursor-pointer"
                   >
                     🔍 Aplicar filtros
                   </button>
                   <button
                     type="button"
                     onClick={aplicarFiltroHoy}
-                    className="bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-600 transition"
+                    className="bg-amber-500 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-600 transition cursor-pointer"
                   >
                     ⚡ Atendidos Hoy
                   </button>
                   <button
                     type="button"
                     onClick={limpiarFiltrosAtenciones}
-                    className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition"
+                    className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer"
                   >
                     Limpiar
                   </button>
@@ -639,15 +639,9 @@ const ReportesPage = () => {
               <BotonesExportacion tipo="turnos" />
             </div>
 
-            {/* REPORTES GERENCIALES EXCLUSIVOS PARA ADMIN */}
+            {/* SECCIÓN EXCLUSIVA PARA ADMIN */}
             {role === 'admin' && (
               <>
-                <div className="pt-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-white bg-white/20 px-3 py-1 rounded-full">
-                    🔒 Reportes Gerenciales y de Auditoría (Exclusivo Administración)
-                  </span>
-                </div>
-
                 {/* 6. PRODUCTIVIDAD POR VETERINARIO */}
                 <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-2">
                   <div className="flex justify-between items-center border-b border-gray-100 pb-2">
