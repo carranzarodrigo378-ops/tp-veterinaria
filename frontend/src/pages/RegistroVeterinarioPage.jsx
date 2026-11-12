@@ -5,7 +5,7 @@ import api from '../api/axiosConfig';
 const FORM_INICIAL = {
   nombre: '',
   apellido: '',
-  matricula: '',
+  matricula: '', // Aquí se guardan solo los números que siguen a "MP-"
   usuario: '',
   password: '',
   confirmar: '',
@@ -40,7 +40,16 @@ const RegistroVeterinarioPage = () => {
     if (!sesionValida) navigate('/login');
   }, [sesionValida, navigate]);
 
-  const cambiar = (campo) => (e) => setForm((prev) => ({ ...prev, [campo]: e.target.value }));
+  const cambiar = (campo) => (e) => {
+    let valor = e.target.value;
+
+    // En matrícula solo permitimos dígitos numéricos (0-9)
+    if (campo === 'matricula') {
+      valor = valor.replace(/\D/g, '');
+    }
+
+    setForm((prev) => ({ ...prev, [campo]: valor }));
+  };
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -49,17 +58,24 @@ const RegistroVeterinarioPage = () => {
 
     const nombre = form.nombre.trim();
     const apellido = form.apellido.trim();
-    const matricula = form.matricula.trim();
+    const numeroMatricula = form.matricula.trim();
     const usuario = form.usuario.trim();
 
-    if (!nombre  || !apellido || !matricula || !usuario || !form.password) {
+    if (!nombre || !apellido || !numeroMatricula || !usuario || !form.password) {
       setError('Completá todos los campos.');
       return;
     }
+
+    if (numeroMatricula.length < 4) {
+      setError('El número de matrícula debe tener al menos 4 dígitos (Ej: MP-1234).');
+      return;
+    }
+
     if (form.password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
+
     if (form.password !== form.confirmar) {
       setError('Las contraseñas no coinciden.');
       return;
@@ -71,7 +87,7 @@ const RegistroVeterinarioPage = () => {
         usuario,
         password: form.password,
         nombre_completo: `${nombre} ${apellido}`,
-        matricula,
+        matricula: `MP-${numeroMatricula}`, // Se envía completo al backend: "MP-1234"
       });
       setExito(typeof res.data === 'string' ? res.data : 'Veterinario registrado correctamente.');
       setForm(FORM_INICIAL);
@@ -145,13 +161,20 @@ const RegistroVeterinarioPage = () => {
 
           <div>
             <label className="block text-[11px] text-gray-500 font-semibold mb-1">Matrícula</label>
-            <input
-              type="text"
-              value={form.matricula}
-              onChange={cambiar('matricula')}
-              placeholder="Ej: MP-1234"
-              className={inputClase}
-            />
+            <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#129b9b]/50">
+              <span className="bg-gray-100 text-gray-700 font-bold text-sm px-3 py-2 border-r border-gray-200 select-none">
+                MP-
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={form.matricula}
+                onChange={cambiar('matricula')}
+                placeholder="1234"
+                className="w-full px-3 py-2 text-sm text-gray-800 focus:outline-none"
+              />
+            </div>
           </div>
 
           <h3 className="font-bold text-[#129b9b] text-sm border-b border-[#129b9b]/30 pb-1 pt-2">
