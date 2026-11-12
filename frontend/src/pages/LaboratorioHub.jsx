@@ -54,19 +54,7 @@ useEffect(() => {
               <span className="text-gray-400 font-bold group-hover:translate-x-1 transition-transform">›</span>
             </button>
 
-            <button
-              onClick={() => navigate('/reportes')}
-              className="w-full bg-white text-gray-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:bg-gray-50 transition-all group"
-            >
-              <div className="flex items-center gap-4 text-left">
-                <span className="text-3xl bg-yellow-100 p-2.5 rounded-xl">📊</span>
-                <div>
-                  <h3 className="font-bold text-[#129b9b] text-sm">Reportes de Negocio</h3>
-                  <p className="text-[11px] text-gray-500">Muestras rechazadas, tiempos de tránsito y vacunas.</p>
-                </div>
-              </div>
-              <span className="text-gray-400 font-bold group-hover:translate-x-1 transition-transform">›</span>
-            </button>
+            
           </div>
         </div>
       </div>
