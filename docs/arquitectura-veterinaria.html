@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TP Veterinaria — Arquitectura y Dominio</title>
+    <style>
+      :root { --ink:#1f2937; --muted:#64748b; --blue:#1d4ed8; --blue-soft:#dbeafe; --green:#059669; --border:#e2e8f0; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:#f1f5f9; color:var(--ink); font:15px/1.55 "Segoe UI",Arial,sans-serif; }
+      .page { max-width:1050px; margin:32px auto; background:white; box-shadow:0 12px 32px #0f172a18; }
+      header { padding:38px 48px; color:white; background:linear-gradient(130deg,#0f172a,#1d4ed8 70%,#0ea5e9); }
+      header small { text-transform:uppercase; letter-spacing:.16em; opacity:.85; }
+      h1 { margin:8px 0; font-size:38px; line-height:1.15; }
+      header p { margin:0; opacity:.9; }
+      main { padding:30px 48px 45px; }
+      section { margin:0 0 28px; break-inside:avoid; }
+      h2 { font-size:23px; margin:0 0 13px; padding-bottom:7px; border-bottom:2px solid var(--blue-soft); color:#0f172a; }
+      h3 { margin:0 0 9px; color:var(--blue); font-size:17px; }
+      .summary { border-left:5px solid var(--blue); background:#f8fafc; border-radius:8px; padding:15px 18px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+      .card,.entity { border:1px solid var(--border); border-radius:11px; padding:15px 17px; background:white; break-inside:avoid; }
+      ul { margin:0; padding-left:19px; } li+li { margin-top:5px; }
+      .entities { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:11px; }
+      .entity h3 { color:#0f172a; font-size:15px; margin-bottom:5px; }
+      .entity p { margin:0; font-size:13px; color:var(--muted); }
+      .flow { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px; text-align:center; font-weight:600; }
+      .note { font-size:12px; color:var(--muted); margin-top:24px; }
+      code { background:#f1f5f9; padding:1px 4px; border-radius:4px; }
+      @media(max-width:720px) { .page{margin:0}.grid,.entities{grid-template-columns:1fr}header,main{padding:25px}h1{font-size:30px} }
+      @media print { body{background:white} .page{max-width:none;margin:0;box-shadow:none} header{print-color-adjust:exact;-webkit-print-color-adjust:exact} section,.card,.entity{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <small>Guía de arquitectura y dominio</small>
+        <h1>TP Veterinaria</h1>
+        <p>Red de clínicas veterinarias y derivación de muestras a laboratorio central</p>
+      </header>
+      <main>
+        <section>
+          <h2>Resumen</h2>
+          <div class="summary">Aplicación web para administrar clientes, pacientes, atención veterinaria y derivación de muestras biológicas. El frontend es una SPA en React; el backend expone una API REST con FastAPI, y la persistencia activa se realiza en SQLite. El dominio pone especial énfasis en el seguimiento de muestras desde su extracción hasta el resultado o rechazo.</div>
+        </section>
+        <section>
+          <h2>Frameworks y tecnologías</h2>
+          <div class="grid">
+            <div class="card"><h3>Frontend</h3><ul><li>React 19 y Vite 8.</li><li>React Router DOM para navegación cliente.</li><li>Axios para llamadas HTTP a la API.</li><li>React Hook Form para manejo de formularios.</li><li>Tailwind CSS 4 y hojas CSS propias.</li></ul></div>
+            <div class="card"><h3>Backend y datos</h3><ul><li>Python 3.12, FastAPI y Uvicorn.</li><li>Pydantic 2 para esquemas y validación de datos.</li><li>SQLite, acceso mediante <code>sqlite3</code> y consultas SQL directas.</li><li>JWT para autenticación, bcrypt para hashes de contraseña.</li><li>pytest para pruebas; GitHub Actions para CI.</li></ul></div>
+          </div>
+          <p><strong>Aclaración:</strong> SQLAlchemy figura en las dependencias, pero el código de persistencia revisado utiliza <code>sqlite3</code> y DAOs, no SQLAlchemy como ORM activo.</p>
+        </section>
+        <section>
+          <h2>Decisiones arquitectónicas</h2>
+          <div class="grid">
+            <div class="card"><h3>Aplicación cliente-servidor</h3><p>El navegador ejecuta React y consume una API REST FastAPI. Es una aplicación organizada en dos capas desplegables, no una arquitectura de microservicios.</p></div>
+            <div class="card"><h3>Backend por responsabilidades</h3><p><code>rutas/</code> expone endpoints; <code>servicios/</code> coordina casos de uso; <code>persistencia/</code> contiene DAOs y SQL; <code>dominio/</code> representa entidades y reglas.</p></div>
+            <div class="card"><h3>DAO y SQLite</h3><p>Los DAO encapsulan consultas y operaciones. Un singleton mantiene la conexión; <code>schema.sql</code> crea tablas, restricciones, índices y datos semilla al iniciar.</p></div>
+            <div class="card"><h3>Patrón State</h3><p>El comportamiento de <code>MuestraBiologica</code> depende de su estado. Cada estado habilita transiciones específicas y rechaza operaciones no permitidas.</p></div>
+            <div class="card"><h3>Auditoría de trazabilidad</h3><p>Los cambios de estado de las muestras se agregan a un historial. Triggers en SQLite bloquean la actualización y eliminación de esos registros históricos.</p></div>
+            <div class="card"><h3>Autenticación y autorización</h3><p>Tokens JWT firmados con HS256, contraseñas protegidas con bcrypt y dependencias de FastAPI para validar identidad y roles.</p></div>
+            <div class="card"><h3>Frontend por rutas y páginas</h3><p><code>App.jsx</code> define rutas; las páginas agrupan áreas funcionales y <code>src/api/</code> centraliza el cliente Axios. Hay un componente ProtectedRoute, aunque las rutas principales visibles no lo envuelven allí.</p></div>
+            <div class="card"><h3>Validaciones en varias capas</h3><p>Pydantic valida entradas HTTP y SQLite aplica claves foráneas, campos únicos, restricciones CHECK e índices.</p></div>
+          </div>
+        </section>
+        <section>
+          <h2>Entidades relevantes del dominio</h2>
+          <div class="entities">
+            <div class="entity"><h3>Cliente</h3><p>Persona responsable de mascotas y destinataria de comprobantes; puede vincularse con un usuario.</p></div>
+            <div class="entity"><h3>Mascota</h3><p>Paciente con especie, raza, sexo y datos de nacimiento; tiene un cliente responsable.</p></div>
+            <div class="entity"><h3>HistoriaClinica</h3><p>Registro clínico asociado a una mascota que agrupa consultas.</p></div>
+            <div class="entity"><h3>Clinica</h3><p>Sede de atención con veterinarios, consultas y turnos asociados.</p></div>
+            <div class="entity"><h3>Veterinario</h3><p>Profesional de una clínica que atiende consultas y puede tener turnos.</p></div>
+            <div class="entity"><h3>Turno</h3><p>Reserva para una mascota; contempla fecha, horario, estado y veterinario asignado.</p></div>
+            <div class="entity"><h3>Consulta</h3><p>Atención clínica vinculada a historia, veterinario y clínica; registra motivo, diagnóstico y tratamiento.</p></div>
+            <div class="entity"><h3>Vacuna / EsquemaVacunal</h3><p>Catálogo de vacunas y reglas por especie, edad, obligatoriedad e intervalo de refuerzo.</p></div>
+            <div class="entity"><h3>VacunaAplicada</h3><p>Aplicación registrada durante una consulta, con fecha y lote.</p></div>
+            <div class="entity"><h3>Laboratorio</h3><p>Destino de las órdenes de derivación y receptor de muestras.</p></div>
+            <div class="entity"><h3>TipoAnalisis</h3><p>Catálogo de análisis, tipo de muestra, precio y temperatura de almacenamiento.</p></div>
+            <div class="entity"><h3>OrdenDerivacion</h3><p>Pedido de estudio asociado a una consulta, un análisis y un laboratorio.</p></div>
+            <div class="entity"><h3>Muestra</h3><p>Material biológico con código, tipo, fecha de extracción y estado actual; eje del flujo de trazabilidad.</p></div>
+            <div class="entity"><h3>HistorialEstadoMuestra</h3><p>Bitácora append-only de estados, fechas, usuarios y observaciones de una muestra.</p></div>
+            <div class="entity"><h3>RemitoBiologico</h3><p>Documento de envío desde una clínica hacia un laboratorio, con estado y fecha.</p></div>
+            <div class="entity"><h3>Contenedor y Precinto</h3><p>El contenedor conserva las muestras; el precinto permite comprobar la integridad del envío.</p></div>
+            <div class="entity"><h3>EventoEnvio / RecepcionLab</h3><p>Registran hitos del transporte y la recepción, incluida la verificación del precinto.</p></div>
+            <div class="entity"><h3>ResultadoAnalisis</h3><p>Resultado validado por el laboratorio y asociado a una muestra.</p></div>
+            <div class="entity"><h3>Comprobante / ItemComprobante</h3><p>Comprobante de atención con renglones de consulta, vacuna o análisis.</p></div>
+            <div class="entity"><h3>Usuario</h3><p>Cuenta autenticable asociada opcionalmente a cliente o veterinario y con rol de acceso.</p></div>
+          </div>
+        </section>
+        <section>
+          <h2>Relaciones y flujo de negocio</h2>
+          <div class="flow">Cliente → Mascota → Historia clínica → Consulta → Orden de derivación → Muestra → Remito y transporte → Recepción de laboratorio → Resultado</div>
+          <p>Una mascota tiene responsable e historia clínica; la historia reúne consultas; una consulta puede originar órdenes. La muestra mantiene un historial de estados. El remito conecta la clínica de origen, el laboratorio de destino, el contenedor y el precinto. Si el precinto llega roto, la muestra debe rechazarse.</p>
+        </section>
+        <section>
+          <h2>Ciclo de vida de una muestra</h2>
+          <div class="flow">Extraída → Empaquetada → En tránsito → Recibida → Analizada<br />Si el precinto está roto: Recibida → Rechazada</div>
+        </section>
+        <section>
+          <h2>Observaciones técnicas</h2>
+          <ul>
+            <li>La conexión define una ruta SQLite fija; también existe una configuración separada con <code>RUTA_BD</code>. Conviene unificar ambas fuentes de configuración.</li>
+            <li>En <code>main.py</code> se observan duplicados del middleware de renovación de token y del registro CORS; sería bueno consolidarlos.</li>
+            <li>La prueba visible en el repositorio comprueba el endpoint de salud. La CI corre pytest y construye el frontend.</li>
+            <li>El uso de una conexión SQLite singleton es simple para el alcance actual; concurrencia y crecimiento de carga merecen evaluación si el sistema evoluciona.</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Conclusión</h2>
+          <div class="summary">La solución combina gestión clínica con logística de laboratorio. Su decisión de diseño más distintiva es tratar la muestra como una entidad con ciclo de vida y auditoría persistente, conectando las operaciones clínicas con el transporte, la recepción segura y el resultado del análisis.</div>
+        </section>
+        <p class="note">Documento elaborado a partir del README, código fuente, esquema SQL y documentación de dominio del repositorio. Para obtener el PDF: abrir este HTML en un navegador y elegir Imprimir → Guardar como PDF.</p>
+      </main>
+    </div>
+  </body>
+</html>
