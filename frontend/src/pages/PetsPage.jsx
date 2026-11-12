@@ -9,14 +9,13 @@ const PetsPage = () => {
 
   // Datos de sesión
   const rol = localStorage.getItem('role') || 'cliente';
-  const nombreCliente = localStorage.getItem('clientName') || 'Cliente';
   const idCliente = Number(localStorage.getItem('clientId'));
 
   // Estados principales
   const [mascotas, setMascotas] = useState([]);
   const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
-  
-  // NUEVO: Estado para el buscador
+
+  // Estado para el buscador
   const [busqueda, setBusqueda] = useState('');
 
   const [cargando, setCargando] = useState(true);
@@ -215,7 +214,7 @@ const PetsPage = () => {
     return edad < 0 ? 'No disponible' : `${edad} años`;
   };
 
-  // NUEVO: Lógica de filtrado
+  // Lógica de filtrado
   const mascotasFiltradas = mascotas.filter((mascota) => {
     const texto = busqueda.toLowerCase();
     return (
@@ -301,11 +300,7 @@ const PetsPage = () => {
             <h2 className="font-bold text-lg">
               {rol === 'cliente' ? 'Mis Mascotas' : 'Padrón de Pacientes'} ({mascotasFiltradas.length})
             </h2>
-            {rol === 'cliente' ? (
-              <p className="text-[10px] text-cyan-100">
-                {nombreCliente} (ID: {idCliente})
-              </p>
-            ) : (
+            {rol !== 'cliente' && (
               <p className="text-[10px] text-amber-300">
                 Vista de Staff Veterinario
               </p>
@@ -314,7 +309,7 @@ const PetsPage = () => {
           <div className="w-10" />
         </div>
 
-        {/* NUEVO: Barra de búsqueda */}
+        {/* Barra de búsqueda */}
         {!cargando && !error && (mascotas.length > 0 || busqueda !== '') && (
           <div className="mb-4">
             <input
@@ -347,7 +342,7 @@ const PetsPage = () => {
           </div>
         )}
 
-        {/* Listado Filtrado */}
+        {/* Listado filtrado */}
         {!cargando && !error && (
           <div className="space-y-3">
             {mascotasFiltradas.length > 0 ? (
@@ -394,7 +389,7 @@ const PetsPage = () => {
           </div>
         )}
 
-        {/* Modal de registro (sin cambios) */}
+        {/* Modal de registro */}
         {mostrarModal && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
             <div className="bg-white text-gray-800 p-5 rounded-3xl w-full max-w-sm space-y-4 shadow-2xl">
