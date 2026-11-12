@@ -80,7 +80,7 @@ const Login = () => {
       guardarSesion(access_token, rol, usuario, id_cliente);
     } catch (err) {
       console.error(err);
-      setErrorMensaje(err.response?.data?.detail || 'Usuario o contraseña incorrectos');
+      setErrorMensaje('Datos incorrectos, ingrese bien los datos');
     } finally {
       setCargando(false);
     }
@@ -405,9 +405,12 @@ const Login = () => {
 
                         <input
                           type="tel"
+                          inputMode="tel"
                           placeholder="Teléfono (opcional)"
                           value={regTelefono}
-                          onChange={(e) => setRegTelefono(e.target.value)}
+                          onChange={(e) => {const valorValido = e.target.value.replace(/[^0-9+]/g, '');
+                          setRegTelefono(valorValido);
+                          }}
                           className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
                         />
                         <input
