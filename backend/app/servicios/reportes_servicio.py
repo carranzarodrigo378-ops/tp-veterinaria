@@ -51,9 +51,6 @@ class ServicioReportes:
     def reporte_productividad_veterinarios(self) -> list[dict]:
         return reportes_dao.productividad_veterinarios()
 
-    def reporte_facturacion_detallada(self) -> dict:
-        return reportes_dao.facturacion_detallada()
-
     def reporte_estado_turnos(self) -> dict:
         return reportes_dao.estado_turnos()
 
@@ -183,16 +180,15 @@ class ServicioReportes:
                 [f["total_derivaciones"] for f in filas],
                 "Demanda por Tipo de Estudio Clínico",
             )
-            filas_tabla = [["ID", "Estudio Clínico", "Muestra", "Derivaciones", "Subtotal Est."]]
+            filas_tabla = [["ID", "Estudio Clínico", "Tipo de Muestra", "Total Derivaciones"]]
             for f in filas:
                 filas_tabla.append([
                     str(f["id_tipo_analisis"]),
-                    str(f["tipo_analisis"])[:22],
+                    str(f["tipo_analisis"])[:26],
                     str(f["tipo_muestra"]).capitalize(),
                     str(f["total_derivaciones"]),
-                    f"${f.get('monto_estimado', 0):,.2f}",
                 ])
-            anchos = [0.6 * inch, 2.3 * inch, 1.2 * inch, 1.3 * inch, 1.5 * inch]
+            anchos = [0.8 * inch, 2.8 * inch, 1.6 * inch, 1.7 * inch]
 
         elif tipo_reporte == "alertas-vacunas":
             filas = self.reporte_alertas_vacunacion()
@@ -240,29 +236,6 @@ class ServicioReportes:
                     str(f["ordenes_derivadas"]),
                 ])
             anchos = [0.9 * inch, 1.6 * inch, 1.6 * inch, 0.9 * inch, 0.9 * inch, 1.0 * inch]
-
-        elif tipo_reporte == "facturacion":
-            datos = self.reporte_facturacion_detallada()
-            titulo = "Informe Financiero de Facturación y Comprobantes"
-            subtitulo = (
-                f"Emitido: {fecha_str} | Comprobantes: {datos['cantidad_comprobantes']} | "
-                f"Recaudación Total: ${datos['recaudacion_total']:,.2f}"
-            )
-            grafico = self._crear_grafico_torta(
-                [r["rubro"].capitalize() for r in datos["desglose_por_rubro"]],
-                [r["recaudacion"] for r in datos["desglose_por_rubro"]],
-                "Ingresos por Rubro Facturado",
-            )
-            filas_tabla = [["N° Comp.", "Fecha Emisión", "Sucursal", "Cliente", "Total"]]
-            for c in datos["comprobantes_emitidos"]:
-                filas_tabla.append([
-                    f"COMP-{c['numero']}",
-                    str(c["fecha_emision"])[:16],
-                    str(c["clinica"])[:18],
-                    str(c["cliente"])[:20],
-                    f"${c['total']:,.2f}",
-                ])
-            anchos = [1.1 * inch, 1.4 * inch, 1.6 * inch, 1.6 * inch, 1.2 * inch]
 
         elif tipo_reporte == "turnos":
             datos = self.reporte_estado_turnos()
@@ -359,8 +332,6 @@ class ServicioReportes:
             datos = self.reporte_alertas_vacunacion()
         elif tipo_reporte == "productividad-veterinarios":
             datos = self.reporte_productividad_veterinarios()
-        elif tipo_reporte == "facturacion":
-            datos = self.reporte_facturacion_detallada()["comprobantes_emitidos"]
         elif tipo_reporte == "turnos":
             datos = self.reporte_estado_turnos()["detalle_turnos"]
         else:

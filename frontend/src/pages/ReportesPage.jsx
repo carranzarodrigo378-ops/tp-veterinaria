@@ -19,7 +19,6 @@ const ReportesPage = () => {
   const [derivaciones, setDerivaciones] = useState([]);
   const [alertasVacunas, setAlertasVacunas] = useState([]);
   const [productividad, setProductividad] = useState([]);
-  const [facturacion, setFacturacion] = useState(null);
   const [turnos, setTurnos] = useState(null);
   const [demografia, setDemografia] = useState(null);
 
@@ -42,7 +41,6 @@ const ReportesPage = () => {
       const res = await fetch(`${API_BASE}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Si el backend envía token renovado por interacción, lo actualizamos
       const tokenRenovado = res.headers.get('X-Renewed-Token');
       if (tokenRenovado) {
         localStorage.setItem('token', tokenRenovado);
@@ -99,15 +97,13 @@ const ReportesPage = () => {
       setAlertasVacunas(Array.isArray(resVacunas) ? resVacunas : []);
       setTurnos(resTurnos);
 
-      // 2. Reportes gerenciales, contables y de auditoría (exclusivos para Admin)
+      // 2. Reportes gerenciales y de auditoría (exclusivos para Admin)
       if (role === 'admin') {
-        const [resProd, resFact, resDemo] = await Promise.all([
+        const [resProd, resDemo] = await Promise.all([
           fetchConAuth('/productividad-veterinarios'),
-          fetchConAuth('/facturacion'),
           fetchConAuth('/demografia-mascotas'),
         ]);
         setProductividad(Array.isArray(resProd) ? resProd : []);
-        setFacturacion(resFact);
         setDemografia(resDemo);
       }
     } catch (err) {
@@ -133,7 +129,6 @@ const ReportesPage = () => {
   };
 
   const aplicarFiltroHoy = async () => {
-    // Fecha local (toISOString usa UTC y de noche devolvería el día siguiente)
     const hoy = new Date().toLocaleDateString('en-CA');
     setFechaDesde(hoy);
     setFechaHasta(hoy);
@@ -203,7 +198,7 @@ const ReportesPage = () => {
 
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
-      {/* Fondo exterior (mismo que el módulo Laboratorio) */}
+      {/* Fondo exterior */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
@@ -239,7 +234,7 @@ const ReportesPage = () => {
           </div>
         )}
 
-        {/* KPIs Resumen General */}
+        {/* KPIs Resumen General del Dominio */}
         {resumen && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-center">
             <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
@@ -256,17 +251,10 @@ const ReportesPage = () => {
               <p className="text-[11px] opacity-80">Muestras Totales</p>
               <p className="text-lg font-extrabold">{resumen.total_muestras ?? 0}</p>
             </div>
-            {role === 'admin' ? (
-              <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
-                <p className="text-[11px] opacity-80">Facturación Total</p>
-                <p className="text-lg font-extrabold">${resumen.facturacion_total ?? 0}</p>
-              </div>
-            ) : (
-              <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
-                <p className="text-[11px] opacity-80">Remitos en Tránsito</p>
-                <p className="text-lg font-extrabold">{resumen.remitos_en_transito ?? 0}</p>
-              </div>
-            )}
+            <div className="bg-white/15 backdrop-blur-sm p-2.5 rounded-2xl">
+              <p className="text-[11px] opacity-80">Remitos en Tránsito</p>
+              <p className="text-lg font-extrabold">{resumen.remitos_en_transito ?? 0}</p>
+            </div>
           </div>
         )}
 
@@ -280,14 +268,13 @@ const ReportesPage = () => {
                 REPORTES CLÍNICOS Y OPERATIVOS (VISIBLES PARA VETERINARIO Y ADMIN)
                 ================================================================= */}
 
-            {/* 1. REPORTE DINÁMICO DE ATENCIONES (PEDIDO DEL PROFESOR) */}
+            {/* 1. REPORTE DINÁMICO DE ATENCIONES */}
             <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-2">
               <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
                 <span>1. Atenciones Clínicas (Consulta Variable Dinámica)</span>
                 <span>🩺</span>
               </h3>
 
-              {/* Controles de filtro en 1 sola consulta */}
               <form onSubmit={filtrarAtenciones} className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                 <div>
                   <label className="block text-[10px] text-gray-500 font-semibold">Desde</label>
@@ -443,7 +430,7 @@ const ReportesPage = () => {
               <BotonesExportacion tipo="alertas-vacunas" />
             </div>
 
-            {/* 5. GESTIÓN DE TURNOS (OPERATIVO PARA VETERINARIO Y ADMIN) */}
+            {/* 5. GESTIÓN DE TURNOS */}
             <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
               <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
                 <span>5. Estado de Turnos Programados</span>
@@ -469,7 +456,7 @@ const ReportesPage = () => {
               <>
                 <div className="pt-2 pb-0.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-white/90 bg-white/15 px-3 py-1 rounded-full">
-                    🔒 Reportes Gerenciales y Contables (Exclusivo Administración)
+                    🔒 Reportes Gerenciales y de Auditoría (Exclusivo Administración)
                   </span>
                 </div>
 
@@ -491,28 +478,10 @@ const ReportesPage = () => {
                   <BotonesExportacion tipo="productividad-veterinarios" />
                 </div>
 
-                {/* 7. FACTURACIÓN Y COMPROBANTES EMITIDOS */}
+                {/* 7. PADRÓN DEMOGRÁFICO Y AUDITORÍA DE BAJAS LÓGICAS */}
                 <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
                   <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                    <span>7. Facturación y Comprobantes de Atención</span>
-                    <span>🧾</span>
-                  </h3>
-                  <p className="text-gray-600 pt-1">
-                    Comprobantes emitidos: <strong>{facturacion?.cantidad_comprobantes ?? 0}</strong> | Recaudación
-                    Total: <strong>${facturacion?.recaudacion_total ?? 0}</strong>
-                  </p>
-                  {facturacion?.desglose_por_rubro?.map((r, i) => (
-                    <p key={i} className="text-gray-500 text-[11px]">
-                      • Rubro {r.rubro}: <strong>${r.recaudacion}</strong> ({r.items_vendidos} ítems)
-                    </p>
-                  ))}
-                  <BotonesExportacion tipo="facturacion" />
-                </div>
-
-                {/* 8. PADRÓN DEMOGRÁFICO Y AUDITORÍA DE BAJAS LÓGICAS */}
-                <div className="bg-white p-4 rounded-2xl shadow-md text-xs space-y-1">
-                  <h3 className="font-bold text-[#129b9b] text-sm flex justify-between border-b border-[#129b9b]/30 pb-1">
-                    <span>8. Padrón de Mascotas y Bajas Lógicas</span>
+                    <span>7. Padrón de Mascotas y Auditoría de Bajas Lógicas</span>
                     <span>🐾</span>
                   </h3>
                   {demografia?.distribucion_especies?.map((esp, i) => (

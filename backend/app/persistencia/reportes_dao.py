@@ -40,9 +40,7 @@ class ReportesDAO(BaseDAO):
                 (SELECT COUNT(*) FROM ordenes_derivacion)             AS total_derivaciones,
                 (SELECT COUNT(*) FROM muestras)                       AS total_muestras,
                 (SELECT COUNT(*) FROM remitos_biologicos
-                  WHERE estado = 'en_transito')                       AS remitos_en_transito,
-                (SELECT COALESCE(ROUND(SUM(total), 2), 0)
-                   FROM comprobantes)                                 AS facturacion_total
+                  WHERE estado = 'en_transito')                       AS remitos_en_transito
         """
         return self._consultar(sql)[0]
 
@@ -77,12 +75,10 @@ class ReportesDAO(BaseDAO):
                 t.id_tipo_analisis,
                 t.nombre AS tipo_analisis,
                 t.tipo_muestra,
-                COUNT(od.id_orden_derivacion) AS total_derivaciones,
-                COALESCE(t.precio, 0) AS precio_unitario,
-                ROUND(COUNT(od.id_orden_derivacion) * COALESCE(t.precio, 0), 2) AS monto_estimado
+                COUNT(od.id_orden_derivacion) AS total_derivaciones
             FROM ordenes_derivacion od
             JOIN tipo_analisis t ON t.id_tipo_analisis = od.tipo_analisis_id
-            GROUP BY t.id_tipo_analisis, t.nombre, t.tipo_muestra, t.precio
+            GROUP BY t.id_tipo_analisis, t.nombre, t.tipo_muestra
             ORDER BY total_derivaciones DESC
         """
         return self._consultar(sql)
@@ -251,47 +247,7 @@ class ReportesDAO(BaseDAO):
         return self._consultar(sql)
 
     # ------------------------------------------------------------------
-    # 7. GET /facturacion
-    # ------------------------------------------------------------------
-    def facturacion_detallada(self) -> dict:
-        por_rubro = self._consultar(
-            """
-            SELECT
-                tipo AS rubro,
-                SUM(cantidad) AS items_vendidos,
-                ROUND(SUM(cantidad * precio_unitario), 2) AS recaudacion
-            FROM item_comprobante
-            GROUP BY tipo
-            ORDER BY recaudacion DESC
-            """
-        )
-
-        comprobantes = self._consultar(
-            """
-            SELECT
-                comp.id_comprobante,
-                comp.numero,
-                comp.fecha_emision,
-                cl.nombre AS clinica,
-                cli.nombre || ' ' || cli.apellido AS cliente,
-                ROUND(comp.total, 2) AS total
-            FROM comprobantes comp
-            JOIN clinicas cl  ON comp.clinica_id = cl.id_clinica
-            JOIN clientes cli ON comp.cliente_id = cli.id_cliente
-            ORDER BY comp.fecha_emision DESC
-            """
-        )
-
-        total_general = sum(float(c["total"]) for c in comprobantes)
-        return {
-            "recaudacion_total": round(total_general, 2),
-            "cantidad_comprobantes": len(comprobantes),
-            "desglose_por_rubro": por_rubro,
-            "comprobantes_emitidos": comprobantes,
-        }
-
-    # ------------------------------------------------------------------
-    # 8. GET /turnos
+    # 7. GET /turnos
     # ------------------------------------------------------------------
     def estado_turnos(self) -> dict:
         resumen = self._consultar(
@@ -310,12 +266,12 @@ class ReportesDAO(BaseDAO):
                 t.estado,
                 t.motivo,
                 m.nombre AS mascota,
-                v.nombre || ' ' || v.apellido AS veterinario,
+                COALESCE(v.nombre || ' ' || v.apellido, 'Sin asignar (Guardia)') AS veterinario,
                 cl.nombre AS clinica
             FROM turnos t
-            JOIN mascotas m     ON t.mascota_id = m.id_mascota
-            JOIN veterinarios v ON t.veterinario_id = v.id_veterinario
-            JOIN clinicas cl    ON t.clinica_id = cl.id_clinica
+            JOIN mascotas m          ON t.mascota_id = m.id_mascota
+            LEFT JOIN veterinarios v ON t.veterinario_id = v.id_veterinario
+            JOIN clinicas cl         ON t.clinica_id = cl.id_clinica
             ORDER BY t.fecha_hora DESC
             """
         )
@@ -326,7 +282,7 @@ class ReportesDAO(BaseDAO):
         }
 
     # ------------------------------------------------------------------
-    # 9. GET /demografia-mascotas
+    # 8. GET /demografia-mascotas
     # ------------------------------------------------------------------
     def demografia_mascotas(self) -> dict:
         por_especie = self._consultar(
