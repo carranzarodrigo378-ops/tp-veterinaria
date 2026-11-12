@@ -5,17 +5,13 @@ import api from '../api/axiosConfig';
 const Login = () => {
   const navigate = useNavigate();
 
-  // Control de modales: null | 'cliente' | 'veterinario'
-  const [modalTipo, setModalTipo] = useState(null);
+  // Control del modal de acceso y de la pestaña activa: 'login' | 'register'
+  const [modalAbierto, setModalAbierto] = useState(false);
   const [activeTabCliente, setActiveTabCliente] = useState('login');
 
-  // Estados formulario Login Cliente
+  // Estados formulario de Login (común a todos los usuarios)
   const [loginUsuario, setLoginUsuario] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-
-  // Estados formulario Login Veterinario
-  const [vetUsuario, setVetUsuario] = useState('');
-  const [vetPassword, setVetPassword] = useState('');
 
   // Estados formulario Registro Cliente
   const [regUsuario, setRegUsuario] = useState('');
@@ -68,8 +64,8 @@ const Login = () => {
     }
   };
 
-  // 1. Login para Clientes
-  const handleLoginCliente = async (e) => {
+  // 1. Login único: el rol lo determina el backend (res.data.rol)
+  const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMensaje(null);
     setCargando(true);
@@ -84,35 +80,13 @@ const Login = () => {
       guardarSesion(access_token, rol, usuario, id_cliente);
     } catch (err) {
       console.error(err);
-      setErrorMensaje('Datos incorrectos, ingrese bien los datos');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  // 2. Login para Veterinarios / Admin / Laboratorio
-  const handleLoginVeterinario = async (e) => {
-    e.preventDefault();
-    setErrorMensaje(null);
-    setCargando(true);
-
-    try {
-      const res = await api.post('/api/auth/login-json', {
-        usuario: vetUsuario.trim(),
-        password: vetPassword,
-      });
-
-      const { access_token, rol, usuario, id_cliente } = res.data;
-      guardarSesion(access_token, rol, usuario, id_cliente);
-    } catch (err) {
-      console.error(err);
       setErrorMensaje(err.response?.data?.detail || 'Credenciales inválidas');
     } finally {
       setCargando(false);
     }
   };
 
-  // 3. Registro de nuevos Clientes
+  // 2. Registro de nuevos Clientes (solo rol cliente, definido por el backend)
   const handleRegisterCliente = async (e) => {
     e.preventDefault();
     setErrorMensaje(null);
@@ -159,14 +133,12 @@ const Login = () => {
   };
 
   const cerrarModal = () => {
-    setModalTipo(null);
+    setModalAbierto(false);
     setErrorMensaje(null);
     setErrorEmail('');
     setActiveTabCliente('login');
     setLoginUsuario('');
     setLoginPassword('');
-    setVetUsuario('');
-    setVetPassword('');
     setRegDni('');
     setRegUsuario('');
     setRegPassword('');
@@ -209,34 +181,23 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Botones Principales */}
+        {/* Botón Principal */}
         <div className="w-full space-y-3 mb-4">
           <button
             onClick={() => {
               setErrorMensaje(null);
               setErrorEmail('');
               setActiveTabCliente('login');
-              setModalTipo('cliente');
+              setModalAbierto(true);
             }}
             className="w-full bg-[#f1adb6] hover:bg-[#e89ca6] text-white font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95 cursor-pointer"
           >
-            INGRESAR COMO CLIENTE
-          </button>
-
-          <button
-            onClick={() => {
-              setErrorMensaje(null);
-              setErrorEmail('');
-              setModalTipo('veterinario');
-            }}
-            className="w-full bg-white hover:bg-gray-50 text-[#129b9b] font-bold py-3.5 rounded-full shadow-lg tracking-wider text-xs md:text-sm transition-transform active:scale-95 cursor-pointer"
-          >
-            INGRESAR COMO VETERINARIO / LAB
+            INICIAR SESIÓN
           </button>
         </div>
 
         {/* Modal de Acceso */}
-        {modalTipo && (
+        {modalAbierto && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
             <div className="bg-white text-gray-800 p-6 rounded-3xl w-full max-w-xs shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
               <button
@@ -247,9 +208,7 @@ const Login = () => {
               </button>
 
               <h3 className="font-bold text-[#129b9b] text-center text-base">
-                {modalTipo === 'veterinario'
-                  ? 'Acceso Profesional / Laboratorio'
-                  : (activeTabCliente === 'login' ? 'Acceso Cliente' : 'Crear Cuenta Cliente')}
+                {activeTabCliente === 'login' ? 'Iniciar sesión' : 'Crear Cuenta Cliente'}
               </h3>
 
               {/* Mensajes de error generales */}
@@ -259,42 +218,11 @@ const Login = () => {
                 </div>
               )}
 
-              {/* FLUJO VETERINARIO / LABORATORIO */}
-              {modalTipo === 'veterinario' && (
-                <form onSubmit={handleLoginVeterinario} className="space-y-3 text-xs">
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Usuario (ej: vet_franco o lab_central) *"
-                      required
-                      value={vetUsuario}
-                      onChange={(e) => setVetUsuario(e.target.value)}
-                      className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Contraseña *"
-                      required
-                      value={vetPassword}
-                      onChange={(e) => setVetPassword(e.target.value)}
-                      className="w-full border border-gray-200 p-2.5 rounded-xl focus:outline-none focus:border-[#129b9b]"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={cargando}
-                    className="w-full bg-[#129b9b] hover:bg-[#0e7c7c] text-white font-bold py-3 rounded-full shadow text-xs tracking-wider transition-transform active:scale-95 mt-2 cursor-pointer"
-                  >
-                    {cargando ? 'VALIDANDO...' : 'INGRESAR AL SISTEMA'}
-                  </button>
-                </form>
-              )}
-
-              {/* FLUJO CLIENTE */}
-              {modalTipo === 'cliente' && (
+              {/* FORMULARIOS: login único y registro de clientes */}
+              {(
                 <>
                   {activeTabCliente === 'login' && (
-                    <form onSubmit={handleLoginCliente} className="space-y-2.5 text-xs">
+                    <form onSubmit={handleLogin} className="space-y-2.5 text-xs">
                       <div className="space-y-2">
                         <input
                           type="text"
