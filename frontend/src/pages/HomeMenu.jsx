@@ -31,6 +31,12 @@ const HomeMenu = () => {
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5m-16.5 0v11.25c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V8.25m-16.5 0V6a2.25 2.25 0 012.25-2.25h12A2.25 2.25 0 0119.5 6v2.25" />
       </svg>
     ),
+    // NUEVO: ícono de historial (reloj con flecha circular)
+    history: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-3.1-7.2M21 3v4.5h-4.5" />
+      </svg>
+    ),
     petCard: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h6m-9-9h12a1.5 1.5 0 011.5 1.5v13.5A1.5 1.5 0 0118 22.5H6a1.5 1.5 0 01-1.5-1.5V7.5A1.5 1.5 0 016 4.5z" />
@@ -83,6 +89,15 @@ const HomeMenu = () => {
         icon: icons.petCard,
         path: '/mascotas',
       },
+      // NUEVO
+      {
+        id: 'historial-cliente',
+        tag: 'Historial',
+        title: 'Turnos Anteriores o Programados',
+        description: 'Consultá los turnos pasados o programados de cada una de tus mascotas',
+        icon: icons.history,
+        path: '/historial-turnos',
+      },
     ],
     veterinario: [
       {
@@ -101,6 +116,15 @@ const HomeMenu = () => {
         icon: icons.petCard,
         path: '/mascotas',
       },
+      // NUEVO
+      {
+        id: 'historial-vete',
+        tag: 'Historial',
+        title: 'Turnos Anteriores',
+        description: 'Turnos pasados de cada paciente y su evolución',
+        icon: icons.history,
+        path: '/historial-turnos',
+      },
       {
         id: 'laboratorio-vete',
         tag: 'Diagnóstico',
@@ -108,7 +132,6 @@ const HomeMenu = () => {
         description: 'Ingreso de muestras biológicas y seguimiento de análisis',
         icon: icons.lab,
         path: '/laboratorio-hub',
-  
       },
       {
         id: 'reportes-vete',
@@ -136,6 +159,15 @@ const HomeMenu = () => {
         description: 'Supervisión de agendas, guardias y reasignaciones activas',
         icon: icons.calendar,
         path: '/turnos',
+      },
+      // NUEVO
+      {
+        id: 'historial-admin',
+        tag: 'Historial',
+        title: 'Turnos Anteriores',
+        description: 'Consulta de turnos pasados por paciente',
+        icon: icons.history,
+        path: '/historial-turnos',
       },
       {
         id: 'pacientes-admin',

@@ -11,6 +11,7 @@ import AgendaVeterinaria from './pages/AgendaVeterinaria';
 import RegistroVeterinarioPage from './pages/RegistroVeterinarioPage';
 import RegistroConsultaPage from './pages/RegistroConsultaPage';
 import SesionExpiradaModal from './pages/SesionExpiradaModal';
+import HistorialTurnosPage from './pages/HistorialTurnosPage';
 
 function App() {
   return (
@@ -25,9 +26,11 @@ function App() {
         <Route path="/laboratorio-hub" element={<LaboratorioHub />} />
         <Route path="/muestras" element={<LaboratorioPage />} />
         <Route path="/laboratorio" element={<LaboratorioOnly />} />
+        <Route path="/historial-turnos" element={<HistorialTurnosPage />} />
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/registro-veterinario" element={<RegistroVeterinarioPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
+
         <Route path="/consulta/nueva" element={<RegistroConsultaPage />} />
       </Routes>
     </BrowserRouter>
