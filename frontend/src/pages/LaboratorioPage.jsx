@@ -11,12 +11,95 @@ const ESTADOS = {
   rechazada: { texto: 'Muestra Rechazada', clase: 'bg-red-100 text-red-700' },
 };
 
+// Configuración visual para cada bolita de la línea de tiempo de trazabilidad
+const ESTILOS_HITOS = {
+  extraida: {
+    titulo: 'Extraída',
+    bolita: 'bg-slate-500 ring-slate-200',
+    badge: 'bg-slate-100 text-slate-700 border-slate-200',
+    linea: 'bg-slate-300',
+  },
+  empaquetada: {
+    titulo: 'Empaquetada (Remito Creado)',
+    bolita: 'bg-indigo-500 ring-indigo-200',
+    badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    linea: 'bg-indigo-300',
+  },
+  en_transito: {
+    titulo: 'En Tránsito',
+    bolita: 'bg-amber-500 ring-amber-200',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    linea: 'bg-amber-300',
+  },
+  recibida: {
+    titulo: 'Recibida en Lab',
+    bolita: 'bg-blue-500 ring-blue-200',
+    badge: 'bg-blue-50 text-blue-700 border-blue-200',
+    linea: 'bg-blue-300',
+  },
+  analizada: {
+    titulo: 'Analizada',
+    bolita: 'bg-emerald-500 ring-emerald-200',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    linea: 'bg-emerald-300',
+  },
+  rechazada: {
+    titulo: 'Rechazada',
+    bolita: 'bg-red-500 ring-red-200',
+    badge: 'bg-red-50 text-red-700 border-red-200',
+    linea: 'bg-red-300',
+  },
+};
+
 const infoEstado = (estado) =>
   ESTADOS[estado] ?? { texto: estado, clase: 'bg-gray-100 text-gray-700' };
 
 const fechaCorta = (dt = '') => {
   const [y, m, d] = String(dt).slice(0, 10).split('-');
   return d ? `${d}/${m}/${y}` : '';
+};
+
+const formatearFechaHora = (dt = '') => {
+  if (!dt) return '';
+  const [fecha, hora] = String(dt).trim().split(' ');
+  const [y, m, d] = (fecha || '').split('-');
+  const horaCorta = hora ? hora.slice(0, 5) : '';
+  return d ? `${d}/${m}/${y}${horaCorta ? ` • ${horaCorta} hs` : ''}` : dt;
+};
+
+// Extrae fecha, estado, usuario y observaciones de cada hito de la trazabilidad
+const parsearHito = (hitoStr = '') => {
+  const texto = String(hitoStr);
+  const matchFecha = texto.match(/\[(.*?)\]/);
+  const fechaHora = matchFecha ? matchFecha[1] : '';
+
+  const sinFecha = texto.replace(/\[.*?\]\s*/, '');
+  const partes = sinFecha.split('|').map((p) => p.trim());
+
+  let estado = '';
+  let usuario = '';
+  let obs = '';
+
+  partes.forEach((p) => {
+    if (p.toLowerCase().startsWith('estado:')) {
+      estado = p.slice(7).trim().toLowerCase();
+    } else if (p.toLowerCase().startsWith('usuario:')) {
+      usuario = p.slice(8).trim();
+    } else if (p.toLowerCase().startsWith('obs:')) {
+      obs = p.slice(4).trim();
+    }
+  });
+
+  if (!estado) {
+    return {
+      fechaHora: '',
+      estado: 'extraida',
+      usuario: '',
+      obs: texto,
+    };
+  }
+
+  return { fechaHora, estado, usuario, obs };
 };
 
 const esc = (v) =>
@@ -39,7 +122,6 @@ const LaboratorioPage = () => {
   const [searchMode, setSearchMode] = useState('listado');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Si por error un usuario 'laboratorio' entra a /muestras, lo mandamos a su pantalla /laboratorio
   useEffect(() => {
     if (role === 'laboratorio') {
       navigate('/laboratorio', { replace: true });
@@ -88,10 +170,8 @@ const LaboratorioPage = () => {
     }
   };
 
-  // 1. Empaquetar muestra en conservadora (genera Remito Biológico y Precinto Sanitario)
   const empaquetar = (id) => ejecutarAccion(id, 'empaquetar', {});
 
-  // 2. Despachar al Laboratorio Central (pasa la pelota a LaboratorioOnly.jsx)
   const despachar = (id) => {
     const responsable = (transportistas[id] || 'Transporte Sanitario Vet2Gö').trim();
     ejecutarAccion(id, 'despachar', { responsable_transporte: responsable });
@@ -181,7 +261,7 @@ const LaboratorioPage = () => {
   return (
     <div className="min-h-screen bg-[#0d7373] flex items-center justify-center p-0 md:p-6 relative">
       <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
         style={{ backgroundImage: "url('/logologin.jpg')" }}
       />
 
@@ -190,7 +270,7 @@ const LaboratorioPage = () => {
         <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => navigate('/laboratorio-hub')}
-            className="text-sm font-semibold hover:underline"
+            className="text-sm font-semibold hover:underline cursor-pointer"
           >
             ‹ Volver
           </button>
@@ -202,7 +282,7 @@ const LaboratorioPage = () => {
           </div>
           <button
             onClick={cargarMuestras}
-            className="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded-xl font-semibold"
+            className="text-xs bg-white/20 hover:bg-white/30 px-2 py-1 rounded-xl font-semibold cursor-pointer"
             title="Actualizar"
           >
             ↻
@@ -213,7 +293,7 @@ const LaboratorioPage = () => {
         <div className="bg-white/10 p-1 rounded-2xl flex mb-4 text-xs font-bold">
           <button
             onClick={() => setSearchMode('listado')}
-            className={`flex-1 py-2 rounded-xl transition-all ${
+            className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
               searchMode === 'listado'
                 ? 'bg-white text-[#129b9b] shadow'
                 : 'text-white hover:bg-white/10'
@@ -223,7 +303,7 @@ const LaboratorioPage = () => {
           </button>
           <button
             onClick={() => setSearchMode('codigo')}
-            className={`flex-1 py-2 rounded-xl transition-all ${
+            className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
               searchMode === 'codigo'
                 ? 'bg-white text-[#129b9b] shadow'
                 : 'text-white hover:bg-white/10'
@@ -324,7 +404,7 @@ const LaboratorioPage = () => {
                         <button
                           disabled={ocupada}
                           onClick={() => empaquetar(m.id_muestra)}
-                          className="w-full bg-[#129b9b] hover:bg-[#0d7373] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition"
+                          className="w-full bg-[#129b9b] hover:bg-[#0d7373] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition cursor-pointer"
                         >
                           📦 Empaquetar (Generar Remito y Precinto)
                         </button>
@@ -352,25 +432,24 @@ const LaboratorioPage = () => {
                         <button
                           disabled={ocupada}
                           onClick={() => despachar(m.id_muestra)}
-                          className="w-full bg-[#0d7373] hover:bg-[#095959] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition"
+                          className="w-full bg-[#0d7373] hover:bg-[#095959] disabled:opacity-60 text-white py-2 rounded-lg font-bold text-[11px] transition cursor-pointer"
                         >
                           🚚 Enviar Muestra al Laboratorio
                         </button>
                       </div>
                     )}
 
-                    {/* Cuando ya fue enviada, queda del lado del Laboratorio (LaboratorioOnly.jsx) */}
                     {m.estado_actual === 'en_transito' && (
                       <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl text-[11px] font-medium">
-                        🚚 <strong>En tránsito:</strong> La muestra ya fue despachada. Esperando que el
-                        Laboratorio Central verifique el precinto y registre la recepción.
+                        🚚 <strong>En tránsito:</strong> Remito despachado. Esperando recepción del
+                        Laboratorio Central.
                       </div>
                     )}
 
                     {m.estado_actual === 'recibida' && (
                       <div className="bg-blue-50 border border-blue-200 text-blue-800 p-2.5 rounded-xl text-[11px] font-medium">
-                        🔬 <strong>En procesamiento:</strong> Recibida con precinto intacto en el
-                        Laboratorio Central. Aguardando informe de resultados.
+                        🔬 <strong>Recibida en Lab:</strong> Muestra y precinto verificados con éxito.
+                        Procesando análisis.
                       </div>
                     )}
 
@@ -383,28 +462,87 @@ const LaboratorioPage = () => {
 
                     {m.estado_actual === 'rechazada' && (
                       <div className="bg-red-50 border border-red-200 text-red-700 p-2.5 rounded-xl text-[11px] font-semibold">
-                        🚨 Muestra rechazada por el Laboratorio Central: el precinto sanitario llegó
-                        roto.
+                        🚨 Muestra rechazada por el Laboratorio Central: el precinto llegó roto.
                       </div>
                     )}
 
-                    {/* Historial de Trazabilidad Inmutable */}
+                    {/* LÍNEA DE TIEMPO VISUAL DE TRAZABILIDAD INMUTABLE */}
                     {Array.isArray(m.historial_trazabilidad) &&
                       m.historial_trazabilidad.length > 0 && (
                         <div className="pt-1 border-t border-gray-100">
                           <button
                             type="button"
                             onClick={() => toggleTrazabilidad(m.id_muestra)}
-                            className="text-[10px] font-bold text-[#0d7373] hover:underline"
+                            className="text-[11px] font-bold text-[#0d7373] hover:underline flex items-center gap-1 cursor-pointer"
                           >
-                            {trazabilidadAbierta[m.id_muestra] ? '▼ Ocultar' : '▶ Ver'} Trazabilidad
-                            Inmutable ({m.historial_trazabilidad.length} hitos)
+                            <span>{trazabilidadAbierta[m.id_muestra] ? '▼' : '▶'}</span>
+                            <span>
+                              {trazabilidadAbierta[m.id_muestra] ? 'Ocultar' : 'Ver'} Trazabilidad
+                              Inmutable ({m.historial_trazabilidad.length} hitos)
+                            </span>
                           </button>
+
                           {trazabilidadAbierta[m.id_muestra] && (
-                            <div className="mt-1.5 bg-gray-50 p-2 rounded-xl border border-gray-200 space-y-1 text-[10px] font-mono text-gray-600">
-                              {m.historial_trazabilidad.map((hito, idx) => (
-                                <p key={idx}>• {hito}</p>
-                              ))}
+                            <div className="mt-2.5 bg-slate-50/90 p-3 rounded-2xl border border-slate-200/80">
+                              <div className="relative">
+                                {m.historial_trazabilidad.map((hitoStr, idx) => {
+                                  const hito = parsearHito(hitoStr);
+                                  const estilo =
+                                    ESTILOS_HITOS[hito.estado] || ESTILOS_HITOS.extraida;
+                                  const esUltimo =
+                                    idx === m.historial_trazabilidad.length - 1;
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className="relative flex items-start gap-3 pb-3 last:pb-0"
+                                    >
+                                      {/* Línea vertical conectora de transición */}
+                                      {!esUltimo && (
+                                        <span
+                                          className={`absolute left-[7px] top-4 -bottom-1 w-0.5 ${estilo.linea}`}
+                                        />
+                                      )}
+
+                                      {/* Bolita de color del estado */}
+                                      <span
+                                        className={`relative z-10 mt-0.5 w-4 h-4 rounded-full shrink-0 ring-4 ${estilo.bolita} flex items-center justify-center shadow-xs`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                      </span>
+
+                                      {/* Tarjetita con los datos de la transición */}
+                                      <div className="flex-1 bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs space-y-1">
+                                        <div className="flex flex-wrap justify-between items-center gap-1">
+                                          <span
+                                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${estilo.badge}`}
+                                          >
+                                            {estilo.titulo}
+                                          </span>
+                                          {hito.fechaHora && (
+                                            <span className="text-[10px] text-gray-400 font-medium">
+                                              🕒 {formatearFechaHora(hito.fechaHora)}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="text-[11px] text-gray-600 flex flex-wrap gap-x-3 gap-y-0.5">
+                                          {hito.usuario && (
+                                            <span>
+                                              👤 <strong className="text-gray-700">{hito.usuario}</strong>
+                                            </span>
+                                          )}
+                                          {hito.obs && (
+                                            <span className="text-gray-500 italic">
+                                              “{hito.obs}”
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -412,7 +550,7 @@ const LaboratorioPage = () => {
 
                     <button
                       onClick={() => handleDescargarPDF(m)}
-                      className="w-full bg-[#129b9b]/10 hover:bg-[#129b9b]/20 text-[#129b9b] font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#129b9b]/20 transition-colors mt-2"
+                      className="w-full bg-[#129b9b]/10 hover:bg-[#129b9b]/20 text-[#129b9b] font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#129b9b]/20 transition-colors mt-2 cursor-pointer"
                     >
                       <span>📥</span> Descargar Informe PDF
                     </button>
