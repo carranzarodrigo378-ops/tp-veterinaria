@@ -35,16 +35,6 @@ const PetsPage = () => {
     fecha_nacimiento: ''
   });
 
-  // Control de sesión
-  useEffect(() => {
-    const expiracion = localStorage.getItem('token_expiration');
-
-    if (!expiracion || Date.now() > Number(expiracion)) {
-      alert('Tu sesión ha expirado. Ingresá nuevamente.');
-      localStorage.clear();
-      navigate('/login');
-    }
-  }, [navigate]);
 
   // Función para realizar peticiones HTTP
   const realizarPeticion = async (url, opciones = {}) => {

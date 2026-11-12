@@ -9,11 +9,13 @@ import LaboratorioOnly from './pages/LaboratorioOnly';
 import ReportesPage from './pages/ReportesPage';
 import AgendaVeterinaria from './pages/AgendaVeterinaria';
 import RegistroVeterinarioPage from './pages/RegistroVeterinarioPage';
-import RegistroConsultaPage from './pages/RegistroConsultaPage'; // (Ajustá la ruta según tu carpeta)
+import RegistroConsultaPage from './pages/RegistroConsultaPage';
+import SesionExpiradaModal from './pages/SesionExpiradaModal';
 
 function App() {
   return (
     <BrowserRouter>
+    <SesionExpiradaModal />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/home" element={<HomeMenu />} />

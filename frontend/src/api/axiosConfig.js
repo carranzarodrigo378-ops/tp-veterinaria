@@ -40,10 +40,10 @@ api.interceptors.response.use(
       // Identificamos si el error proviene del inicio de sesión
       const esLogin = error.config?.url?.includes('/api/auth/login-json');
 
-      // Si es un error de login, NO cerramos la sesión ni redirigimos
+      // Si es un error de login, no hacemos nada. 
+      // Si NO es de login (ej: expiró navegando), disparamos el cartel lindo.
       if (!esLogin) {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+        window.dispatchEvent(new CustomEvent('sesion-expirada'));
       }
     }
 
