@@ -22,10 +22,11 @@ router = APIRouter(prefix="/api/muestras", tags=["Muestras y Laboratorio"])
 )
 def crear_muestra(
     datos: MuestraCrear,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        return servicio_muestras.registrar_extraccion(datos)
+        username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+        return servicio_muestras.registrar_extraccion(datos, usuario=username)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -38,10 +39,11 @@ def crear_muestra(
 def empaquetar_muestra(
     id_muestra: int,
     datos: MuestraEmpaquetar,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        return servicio_muestras.empaquetar(id_muestra, datos)
+        username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+        return servicio_muestras.empaquetar(id_muestra, datos, usuario=username)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
@@ -58,10 +60,11 @@ def empaquetar_muestra(
 def despachar_muestra(
     id_muestra: int,
     datos: MuestraDespachar,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        return servicio_muestras.despachar(id_muestra, datos)
+        username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+        return servicio_muestras.despachar(id_muestra, datos, usuario=username)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
@@ -78,15 +81,15 @@ def despachar_muestra(
 def recibir_muestra_en_laboratorio(
     id_muestra: int,
     datos: MuestraRecepcion,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        return servicio_muestras.recibir_en_laboratorio(id_muestra, datos)
+        username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+        return servicio_muestras.recibir_en_laboratorio(id_muestra, datos, usuario=username)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -99,16 +102,43 @@ def recibir_muestra_en_laboratorio(
 def registrar_analisis_muestra(
     id_muestra: int,
     datos: MuestraAnalizar,
-    usuario_actual: dict = Depends(obtener_usuario_actual)
+    usuario_actual: dict = Depends(obtener_usuario_actual),
 ):
     try:
-        return servicio_muestras.registrar_analisis(id_muestra, datos)
+        username = usuario_actual.get("sub") or usuario_actual.get("usuario")
+        return servicio_muestras.registrar_analisis(id_muestra, datos, usuario=username)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ExcepcionTransicionEstado as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+
+@router.get(
+    "/remitos/listado",
+    dependencies=[Depends(obtener_usuario_actual)],
+)
+def listar_remitos_biologicos():
+    """
+    Lista todos los remitos biológicos emitidos con su conservadora,
+    precinto sanitario, estado de envío y cantidad de muestras.
+    """
+    return servicio_muestras.listar_remitos_biologicos()
+
+
+@router.get(
+    "/{id_muestra}/trazabilidad",
+    dependencies=[Depends(obtener_usuario_actual)],
+)
+def obtener_trazabilidad_muestra(id_muestra: int):
+    """
+    Devuelve la cadena de custodia y trazabilidad histórica inmutable de una muestra.
+    """
+    try:
+        return servicio_muestras.obtener_trazabilidad_detallada(id_muestra)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(
