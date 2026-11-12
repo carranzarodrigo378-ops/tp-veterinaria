@@ -108,7 +108,15 @@ const HomeMenu = () => {
         description: 'Ingreso de muestras biológicas y seguimiento de análisis',
         icon: icons.lab,
         path: '/laboratorio-hub',
-        highlight: true,
+  
+      },
+      {
+        id: 'reportes-vete',
+        tag: 'Métricas',
+        title: 'Reportes y Estadísticas',
+        description: 'Auditoría, atenciones mensuales y balance operativo',
+        icon: icons.analytics,
+        path: '/reportes',
       },
     ],
     admin: [
@@ -199,8 +207,8 @@ const HomeMenu = () => {
                 <p className="text-sm font-bold leading-tight">{clientName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm ${roleBadge.color}`}>
-  {roleBadge.label}
-</span>
+                    {roleBadge.label}
+                  </span>
                 </div>
               </div>
             </div>
