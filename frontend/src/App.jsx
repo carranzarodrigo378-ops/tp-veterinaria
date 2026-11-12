@@ -7,6 +7,7 @@ import LaboratorioHub from './pages/LaboratorioHub';
 import LaboratorioPage from './pages/LaboratorioPage';
 import ReportesPage from './pages/ReportesPage';
 import AgendaVeterinaria from './pages/AgendaVeterinaria';
+import RegistroVeterinarioPage from './pages/RegistroVeterinarioPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/laboratorio-hub" element={<LaboratorioHub />} />
         <Route path="/muestras" element={<LaboratorioPage />} />
         <Route path="/reportes" element={<ReportesPage />} />
+        <Route path="/registro-veterinario" element={<RegistroVeterinarioPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
