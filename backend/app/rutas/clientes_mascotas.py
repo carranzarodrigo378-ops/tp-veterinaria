@@ -9,6 +9,7 @@ from app.esquemas.turnos import TurnoPeticion, TurnoEstadoActualizar
 from app.esquemas.enums import EstadoTurno
 from app.servicios.clinica_servicio import servicio_clinica
 from app.servicios.turnos_servicio import servicio_turnos
+from app.servicios.veterinario_servicio import servicio_veterinarios
 from app.persistencia.conexion import DatabaseSingleton
 from app.rutas.dependencias import obtener_usuario_actual, requerir_rol
 
@@ -144,6 +145,15 @@ def obtener_mascota(id_mascota: int):
         return servicio_clinica.obtener_mascota(id_mascota)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# --- ENDPOINTS DE VETERINARIOS ---
+
+@router.get("/veterinarios")
+def listar_veterinarios(
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    return servicio_veterinarios.listar_veterinarios()
 
 
 # --- ENDPOINTS DE TURNOS ---
