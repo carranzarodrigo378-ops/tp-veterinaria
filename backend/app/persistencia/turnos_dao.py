@@ -96,6 +96,27 @@ class TurnoDAO(BaseDAO):
 
     # ---------- consultas para el servicio ----------
 
+    def obtener_todos_con_detalles(self, limite: int = 500, offset: int = 0) -> list[dict]:
+        """Lista todos los turnos incluyendo datos de mascota, dueño y veterinario asignado."""
+        cursor = self.db.get_conexion().execute(
+            """
+            SELECT 
+                t.*,
+                m.id_cliente AS id_cliente,
+                COALESCE(m.nombre, 'Sin nombre') AS nombre_mascota,
+                COALESCE(c.nombre || ' ' || c.apellido, 'Sin dueño asignado') AS nombre_cliente,
+                v.nombre || ' ' || v.apellido AS nombre_veterinario
+            FROM turnos t
+            LEFT JOIN mascotas m ON m.id_mascota = t.mascota_id
+            LEFT JOIN clientes c ON c.id_cliente = m.id_cliente
+            LEFT JOIN veterinarios v ON v.id_veterinario = t.veterinario_id
+            ORDER BY t.fecha_hora_inicio ASC
+            LIMIT ? OFFSET ?
+            """,
+            (limite, offset),
+        )
+        return [dict(f) for f in cursor.fetchall()]
+
     def obtener_por_veterinario(self, veterinario_id: int) -> list[dict]:
         cursor = self.db.get_conexion().execute(
             "SELECT * FROM turnos WHERE veterinario_id = ? ORDER BY fecha_hora_inicio",
@@ -124,16 +145,19 @@ class TurnoDAO(BaseDAO):
         return [dict(f) for f in cursor.fetchall()]
 
     def obtener_agenda_veterinario(self, veterinario_id: int) -> list[dict]:
-        """Agenda completa del veterinario con nombre de mascota y cliente."""
+        """Agenda completa del veterinario con nombre de mascota, cliente y veterinario."""
         cursor = self.db.get_conexion().execute(
             """
             SELECT 
                 t.*,
+                m.id_cliente AS id_cliente,
                 COALESCE(m.nombre, 'Sin nombre') AS nombre_mascota,
-                COALESCE(c.nombre || ' ' || c.apellido, 'Sin dueño asignado') AS nombre_cliente
+                COALESCE(c.nombre || ' ' || c.apellido, 'Sin dueño asignado') AS nombre_cliente,
+                v.nombre || ' ' || v.apellido AS nombre_veterinario
             FROM turnos t
             LEFT JOIN mascotas m ON m.id_mascota = t.mascota_id
             LEFT JOIN clientes c ON c.id_cliente = m.id_cliente
+            LEFT JOIN veterinarios v ON v.id_veterinario = t.veterinario_id
             WHERE t.veterinario_id = ?
             ORDER BY t.fecha_hora_inicio ASC
             """,

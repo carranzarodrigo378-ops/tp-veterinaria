@@ -478,57 +478,78 @@ const AgendaVeterinarioPage = () => {
                   No hay turnos agendados para este día.
                 </div>
               ) : (
-                turnosDelDia.map((t, i) => (
-                  <div
-                    key={t.id_turno ?? i}
-                    className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-2 relative"
-                  >
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                      <span className="font-extrabold text-[#129b9b] text-[13px]">
-                        {soloHora(t.fecha_hora_inicio)} - {soloHora(t.fecha_hora_fin)} hs
-                      </span>
-                      {t.estado && (
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wide ${colorEstado(
-                            t.estado
-                          )}`}
-                        >
-                          {t.estado}
+                turnosDelDia.map((t, i) => {
+                  const idMascota = t.mascota_id ?? t.id_mascota;
+                  const idVet = t.veterinario_id ?? t.id_veterinario;
+                  const nombreMascota =
+                    t.nombre_mascota ||
+                    t.mascota_nombre ||
+                    (idMascota ? `N° ${idMascota}` : 'No especificada');
+                  const nombreCliente =
+                    t.nombre_cliente ||
+                    t.cliente_nombre ||
+                    t.nombre_dueno ||
+                    t.cliente ||
+                    'No asignado';
+                  const nombreVet =
+                    t.nombre_veterinario ||
+                    t.veterinario_nombre ||
+                    t.atendido_por ||
+                    (idVet ? `Veterinario N° ${idVet}` : 'Sin asignar');
+
+                  return (
+                    <div
+                      key={t.id_turno ?? i}
+                      className="bg-white text-gray-800 p-4 rounded-2xl shadow-md text-xs space-y-2 relative"
+                    >
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <span className="font-extrabold text-[#129b9b] text-[13px]">
+                          {soloHora(t.fecha_hora_inicio)} - {soloHora(t.fecha_hora_fin)} hs
                         </span>
-                      )}
-                    </div>
-
-                    <div className="space-y-0.5 pt-1">
-                      <p>
-                        <strong className="text-gray-900 font-semibold">Mascota:</strong>{' '}
-                        {t.nombre_mascota ||
-                          (t.id_mascota ?? t.mascota_id
-                            ? `N° ${t.id_mascota ?? t.mascota_id}`
-                            : 'No especificada')}
-                      </p>
-                      <p>
-                        <strong className="text-gray-900 font-semibold">Dueño:</strong>{' '}
-                        {t.nombre_cliente || t.nombre_dueno || t.cliente || 'No asignado'}
-                      </p>
-                      {(t.motivo || t.servicio) && (
-                        <p className="text-gray-500 text-[11px] mt-1">
-                          <strong>Detalle:</strong> {t.servicio || t.motivo}
-                        </p>
-                      )}
-                    </div>
-
-                    {t.estado !== 'atendido' && (
-                      <div className="pt-2 flex justify-end">
-                        <button
-                          onClick={() => abrirModal(t)}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition text-[11px] cursor-pointer shadow-sm"
-                        >
-                          ✎ Gestionar
-                        </button>
+                        {t.estado && (
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wide ${colorEstado(
+                              t.estado
+                            )}`}
+                          >
+                            {t.estado}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))
+
+                      <div className="space-y-0.5 pt-1">
+                        <p>
+                          <strong className="text-gray-900 font-semibold">Mascota:</strong>{' '}
+                          {nombreMascota}
+                        </p>
+                        <p>
+                          <strong className="text-gray-900 font-semibold">Dueño:</strong>{' '}
+                          {nombreCliente}
+                        </p>
+                        <p>
+                          <strong className="text-gray-900 font-semibold">Veterinario:</strong>{' '}
+                          {nombreVet}
+                        </p>
+                        {(t.motivo || t.servicio) && (
+                          <p className="text-gray-500 text-[11px] mt-1">
+                            <strong>Detalle:</strong> {t.servicio || t.motivo}
+                          </p>
+                        )}
+                      </div>
+
+                      {t.estado !== 'atendido' && (
+                        <div className="pt-2 flex justify-end">
+                          <button
+                            onClick={() => abrirModal(t)}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition text-[11px] cursor-pointer shadow-sm"
+                          >
+                            ✎ Gestionar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </>
@@ -544,6 +565,7 @@ const AgendaVeterinarioPage = () => {
               Actualizando estado del turno de{' '}
               <strong>
                 {turnoSeleccionado.nombre_mascota ||
+                  turnoSeleccionado.mascota_nombre ||
                   `Mascota N°${turnoSeleccionado.mascota_id ?? turnoSeleccionado.id_mascota}`}
               </strong>
             </p>

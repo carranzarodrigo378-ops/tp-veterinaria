@@ -47,7 +47,7 @@ class TurnosServicio:
         return self.turno_dao.obtener_por_id(id_turno)
 
     def listar_turnos(self) -> list[dict]:
-        return self.turno_dao.obtener_todos(limite=500)
+        return self.turno_dao.obtener_todos_con_detalles(limite=500)
 
     def obtener_agenda_veterinario(self, nombre_usuario: str) -> list[dict]:
         """Agenda del veterinario asociado al usuario logueado."""
