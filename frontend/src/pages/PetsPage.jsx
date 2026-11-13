@@ -15,7 +15,7 @@ const PetsPage = () => {
   const [mascotas, setMascotas] = useState([]);
   const [mascotaSeleccionada, setMascotaSeleccionada] = useState(null);
   
-  // NUEVO: Estados para la Historia Clínica
+  // Estados para la Historia Clínica
   const [historiaClinica, setHistoriaClinica] = useState([]);
   const [cargandoHistoria, setCargandoHistoria] = useState(false);
 
@@ -25,6 +25,9 @@ const PetsPage = () => {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  
+  // NUEVO: Estado para la notificación de éxito
+  const [mensajeExito, setMensajeExito] = useState('');
 
   // Modal de registro
   const [mostrarModal, setMostrarModal] = useState(location.state?.returnToTurnos || false);
@@ -147,7 +150,12 @@ const PetsPage = () => {
       await obtenerMascotas();
       setMostrarModal(false);
       setNuevaMascota({ nombre: '', especie: 'Perro', raza: '', sexo: 'macho', fecha_nacimiento: '' });
-      alert('¡Mascota registrada correctamente!');
+      
+      // REEMPLAZO: Mostrar notificación de éxito visual en lugar de alert()
+      setMensajeExito('¡Mascota registrada correctamente!');
+      setTimeout(() => {
+        setMensajeExito('');
+      }, 3000);
 
     } catch (err) {
       alert(`No se pudo registrar la mascota: ${err.message}`);
@@ -156,7 +164,6 @@ const PetsPage = () => {
     }
   };
 
-  // MODIFICADO: Ahora también busca el historial de turnos
   const consultarMascota = async (idMascota) => {
     try {
       // 1. Traer datos básicos de la mascota
@@ -518,6 +525,18 @@ const PetsPage = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* NUEVO: Notificación flotante de éxito */}
+        {mensajeExito && (
+          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] animate-fade-in">
+            <div className="bg-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-green-100">
+              <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-inner">
+                ✓
+              </div>
+              <span className="text-gray-700 font-bold text-sm tracking-wide">{mensajeExito}</span>
             </div>
           </div>
         )}

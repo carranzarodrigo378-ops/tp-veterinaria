@@ -31,7 +31,6 @@ const HomeMenu = () => {
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3.75 8.25h16.5m-16.5 0v11.25c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V8.25m-16.5 0V6a2.25 2.25 0 012.25-2.25h12A2.25 2.25 0 0119.5 6v2.25" />
       </svg>
     ),
-    // NUEVO: ícono de historial (reloj con flecha circular)
     history: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-3.1-7.2M21 3v4.5h-4.5" />
@@ -89,7 +88,6 @@ const HomeMenu = () => {
         icon: icons.petCard,
         path: '/mascotas',
       },
-      // NUEVO
       {
         id: 'historial-cliente',
         tag: 'Historial',
@@ -116,7 +114,6 @@ const HomeMenu = () => {
         icon: icons.petCard,
         path: '/mascotas',
       },
-      // NUEVO
       {
         id: 'historial-vete',
         tag: 'Historial',
@@ -131,7 +128,7 @@ const HomeMenu = () => {
         title: 'Muestras biológicas',
         description: 'Ingreso de muestras biológicas y seguimiento de análisis',
         icon: icons.lab,
-        path: '/laboratorio-hub',
+        path: '/muestras',
       },
       {
         id: 'reportes-vete',
@@ -160,7 +157,6 @@ const HomeMenu = () => {
         icon: icons.calendar,
         path: '/agenda',
       },
-      // NUEVO
       {
         id: 'historial-admin',
         tag: 'Historial',
@@ -183,7 +179,7 @@ const HomeMenu = () => {
         title: 'Muestras biológicas',
         description: 'Monitoreo de órdenes, derivaciones y entregas de resultados',
         icon: icons.lab,
-        path: '/laboratorio-hub',
+        path: '/muestras', 
       },
       {
         id: 'reportes-admin',

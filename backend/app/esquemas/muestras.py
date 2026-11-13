@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.esquemas.enums import EstadoMuestra, EstadoPrecinto
 
+
 class MuestraBase(BaseModel):
     orden_derivacion_id: int
     remito_id: int | None = None
@@ -10,22 +11,31 @@ class MuestraBase(BaseModel):
     fecha_extraccion: datetime
     estado_actual: EstadoMuestra = EstadoMuestra.extraida
 
+
 class MuestraCrear(MuestraBase):
     pass
+
 
 class MuestraDespachar(BaseModel):
     responsable: str | None = None
     observaciones: str | None = None
 
+
 class MuestraEmpaquetar(BaseModel):
-    remito_id: int
+    remito_id: int | None = None
+    codigo_precinto: str | None = None
+    numero_remito: str | None = None
+    contenedor_id: int | None = None
+
 
 class MuestraActualizar(BaseModel):
     remito_id: int | None = None
     estado_actual: EstadoMuestra | None = None
 
+
 class MuestraRespuesta(MuestraBase):
     id_muestra: int
+
 
 class HistorialEstadoMuestraBase(BaseModel):
     muestra_id: int
@@ -34,11 +44,14 @@ class HistorialEstadoMuestraBase(BaseModel):
     usuario: str | None = None
     observaciones: str | None = None
 
+
 class HistorialEstadoMuestraCrear(HistorialEstadoMuestraBase):
     pass
 
+
 class HistorialEstadoMuestraRespuesta(HistorialEstadoMuestraBase):
     id_historial_estado_muestra: int
+
 
 class MuestraRecepcion(BaseModel):
     estado_precinto: EstadoPrecinto
@@ -46,9 +59,11 @@ class MuestraRecepcion(BaseModel):
     recibido_por: str | None = None
     observaciones: str | None = None
 
+
 class MuestraAnalizar(BaseModel):
     resultado: str
     validado_por: str | None = None
+
 
 class MuestraDetalleRespuesta(BaseModel):
     id_muestra: int
