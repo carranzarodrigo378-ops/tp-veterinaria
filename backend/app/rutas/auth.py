@@ -1,7 +1,8 @@
+import re
 import sqlite3
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.seguridad import (
     crear_token_acceso,
@@ -13,6 +14,8 @@ from app.persistencia.conexion import DatabaseSingleton
 from app.rutas.dependencias import obtener_usuario_actual
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+
+_SOLO_DIGITOS_REGEX = re.compile(r"^\d+$", re.ASCII)
 
 
 # --- Esquemas Pydantic ---
@@ -30,6 +33,20 @@ class RegistroClienteEsquema(BaseModel):
     dni: str = Field(default="", description="DNI del cliente (opcional en formulario rápido)")
     email: EmailStr = Field(description="Correo electrónico válido")
     telefono: str = Field(default="", description="Teléfono de contacto")
+
+    @field_validator("telefono")
+    @classmethod
+    def validar_telefono_registro(cls, valor: str) -> str:
+        if valor is None:
+            return ""
+        limpio = valor.strip()
+        if limpio == "":
+            return ""
+        if not _SOLO_DIGITOS_REGEX.fullmatch(limpio):
+            raise ValueError("El teléfono solo debe contener dígitos del 0 al 9.")
+        if not (8 <= len(limpio) <= 15):
+            raise ValueError("El teléfono debe tener entre 8 y 15 dígitos.")
+        return limpio
 
 
 class RegistroVeterinarioEsquema(BaseModel):
@@ -65,7 +82,7 @@ def login(formulario: OAuth2PasswordRequestForm = Depends()):
         "token_type": "bearer",
         "usuario": formulario.username,
         "rol": usuario_info["rol"],
-        "id_cliente": usuario_info["id_cliente"],          # nuevo
+        "id_cliente": usuario_info["id_cliente"],
         "id_veterinario": usuario_info["id_veterinario"],
     }
 

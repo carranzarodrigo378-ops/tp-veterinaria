@@ -26,10 +26,17 @@ const Login = () => {
   const [cargando, setCargando] = useState(false);
   const [errorMensaje, setErrorMensaje] = useState(null);
   const [errorEmail, setErrorEmail] = useState('');
+  const [errorTelefono, setErrorTelefono] = useState('');
 
   const validarFormatoEmail = (email) => {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regexEmail.test(email);
+  };
+
+  // El teléfono es opcional, pero si se ingresa debe tener solo dígitos (8 a 15)
+  const validarFormatoTelefono = (telefono) => {
+    if (!telefono) return true;
+    return /^\d{8,15}$/.test(telefono);
   };
 
   const handleEmailChange = (e) => {
@@ -37,6 +44,14 @@ const Login = () => {
     setRegEmail(valor);
     if (errorEmail && (valor === '' || validarFormatoEmail(valor.trim()))) {
       setErrorEmail('');
+    }
+  };
+
+  const handleTelefonoChange = (e) => {
+    const soloDigitos = e.target.value.replace(/\D/g, '');
+    setRegTelefono(soloDigitos);
+    if (errorTelefono && (soloDigitos === '' || validarFormatoTelefono(soloDigitos))) {
+      setErrorTelefono('');
     }
   };
 
@@ -92,13 +107,20 @@ const Login = () => {
     setErrorMensaje(null);
 
     const emailLimpio = regEmail.trim();
+    const telefonoLimpio = regTelefono.trim();
 
     if (!validarFormatoEmail(emailLimpio)) {
       setErrorEmail('No es válido, ingrese un mail válido');
       return;
     }
 
+    if (!validarFormatoTelefono(telefonoLimpio)) {
+      setErrorTelefono('El teléfono debe contener solo números (entre 8 y 15 dígitos)');
+      return;
+    }
+
     setErrorEmail('');
+    setErrorTelefono('');
     setCargando(true);
 
     try {
@@ -109,7 +131,7 @@ const Login = () => {
         nombre: regNombre.trim(),
         apellido: regApellido.trim(),
         email: emailLimpio,
-        telefono: regTelefono.trim(),
+        telefono: telefonoLimpio,
       });
 
       // Login automático tras registrarse
@@ -126,7 +148,12 @@ const Login = () => {
       );
     } catch (err) {
       console.error(err);
-      setErrorMensaje(err.response?.data?.detail || 'Error al registrar el cliente');
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setErrorMensaje(detail.map((d) => d.msg).join('. '));
+      } else {
+        setErrorMensaje(detail || 'Error al registrar el cliente');
+      }
     } finally {
       setCargando(false);
     }
@@ -136,6 +163,7 @@ const Login = () => {
     setModalAbierto(false);
     setErrorMensaje(null);
     setErrorEmail('');
+    setErrorTelefono('');
     setActiveTabCliente('login');
     setLoginUsuario('');
     setLoginPassword('');
@@ -187,6 +215,7 @@ const Login = () => {
             onClick={() => {
               setErrorMensaje(null);
               setErrorEmail('');
+              setErrorTelefono('');
               setActiveTabCliente('login');
               setModalAbierto(true);
             }}
@@ -258,6 +287,7 @@ const Login = () => {
                             setActiveTabCliente('register');
                             setErrorMensaje(null);
                             setErrorEmail('');
+                            setErrorTelefono('');
                           }}
                           className="text-[#129b9b] font-bold hover:underline cursor-pointer"
                         >
@@ -333,17 +363,35 @@ const Login = () => {
                           )}
                         </div>
 
-                        <input
-                          type="tel"
-                          inputMode="tel"
-                          placeholder="Teléfono (opcional)"
-                          value={regTelefono}
-                          onChange={(e) => {
-                            const valorValido = e.target.value.replace(/[^0-9+]/g, '');
-                            setRegTelefono(valorValido);
-                          }}
-                          className="w-full border border-gray-200 p-2 rounded-xl focus:outline-none focus:border-[#129b9b]"
-                        />
+                        {/* Campo Teléfono (opcional, solo dígitos 0-9, entre 8 y 15 dígitos) */}
+                        <div>
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            maxLength={15}
+                            placeholder="Teléfono (opcional, 8 a 15 dígitos)"
+                            value={regTelefono}
+                            onChange={handleTelefonoChange}
+                            onBlur={() => {
+                              if (regTelefono.trim() && !validarFormatoTelefono(regTelefono.trim())) {
+                                setErrorTelefono(
+                                  'El teléfono debe contener solo números (entre 8 y 15 dígitos)'
+                                );
+                              }
+                            }}
+                            className={`w-full border p-2 rounded-xl focus:outline-none transition-colors ${
+                              errorTelefono
+                                ? 'border-red-500 focus:border-red-500 bg-red-50/30'
+                                : 'border-gray-200 focus:border-[#129b9b]'
+                            }`}
+                          />
+                          {errorTelefono && (
+                            <p className="text-red-500 text-[10px] mt-1 pl-1 font-medium">
+                              {errorTelefono}
+                            </p>
+                          )}
+                        </div>
+
                         <input
                           type="text"
                           placeholder="DNI *"
@@ -371,6 +419,7 @@ const Login = () => {
                             setActiveTabCliente('login');
                             setErrorMensaje(null);
                             setErrorEmail('');
+                            setErrorTelefono('');
                           }}
                           className="text-[#129b9b] font-bold hover:underline cursor-pointer"
                         >
