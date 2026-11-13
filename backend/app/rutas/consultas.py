@@ -1,18 +1,47 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from app.esquemas.consultas import (
     ConsultaMedicaCrear,
     OrdenDerivacionCrear,
     OrdenDerivacionRespuesta,
 )
-from app.esquemas.vacuna import VacunaCrear, VacunaRespuesta
+from app.esquemas.vacuna import (
+    VacunaCrear,
+    VacunaRespuesta,
+    VacunaAplicadaCrear,
+    VacunaAplicadaRespuesta,
+)
 from app.esquemas.esquemaVacunal import EsquemaVacunalCrear, EsquemaVacunalRespuesta
 from app.servicios.consultas_servicio import servicio_consultas
-from app.rutas.dependencias import requerir_rol, obtener_usuario_actual
+from app.rutas.dependencias import obtener_usuario_actual, requerir_rol
 
-router = APIRouter(prefix="/api/atencion", tags=["Consultas y Derivaciones"])
+router = APIRouter(prefix="/api/atencion", tags=["Atención Clínica y Derivaciones"])
 
 
-# --- ENDPOINTS DE VACUNACIÓN (CONFIGURACIÓN) ---
+class RegistrarVacunasAplicadasPeticion(BaseModel):
+    id_turno: int | None = None
+    vacunas: list[VacunaAplicadaCrear] = Field(min_length=1)
+
+
+# --- CATÁLOGO DE TIPOS DE ANÁLISIS ---
+@router.get("/tipos-analisis")
+def obtener_tipos_analisis(
+    usuario_actual: dict = Depends(obtener_usuario_actual),
+):
+    """Devuelve la lista de estudios disponibles en el laboratorio."""
+    return servicio_consultas.listar_tipos_analisis()
+
+
+# --- CATÁLOGO Y CONFIGURACIÓN DE VACUNAS ---
+@router.get(
+    "/vacunas",
+    response_model=list[VacunaRespuesta],
+    dependencies=[Depends(obtener_usuario_actual)],
+)
+def listar_catalogo_vacunas():
+    """Lista las vacunas del catálogo para seleccionarlas durante la atención."""
+    return servicio_consultas.listar_vacunas()
+
 
 @router.post(
     "/vacunas",
@@ -21,7 +50,10 @@ router = APIRouter(prefix="/api/atencion", tags=["Consultas y Derivaciones"])
     dependencies=[Depends(requerir_rol(["admin"]))],
 )
 def crear_vacuna(datos: VacunaCrear):
-    return servicio_consultas.registrar_vacuna(datos)
+    try:
+        return servicio_consultas.registrar_vacuna(datos)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post(
@@ -35,27 +67,48 @@ def crear_esquema_vacunal(datos: EsquemaVacunalCrear):
         return servicio_consultas.registrar_esquema_vacunal(datos)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-# --- ENDPOINTS CLÍNICOS (VETERINARIOS) ---
-
-@router.post(
-    "/consultas",
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
-)
-def registrar_consulta_clinica(
+# --- CONSULTAS MÉDICAS ---
+@router.post("/consultas", status_code=status.HTTP_201_CREATED)
+def registrar_consulta(
     datos: ConsultaMedicaCrear,
-    usuario_actual: dict = Depends(obtener_usuario_actual),
+    usuario_actual: dict = Depends(requerir_rol(["veterinario", "admin"])),
 ):
     try:
-        return servicio_consultas.registrar_consulta(
-            datos, veterinario=usuario_actual["usuario"]
+        veterinario_nombre = usuario_actual.get("usuario") or usuario_actual.get("sub") or "Veterinario"
+        return servicio_consultas.registrar_consulta(datos, veterinario=veterinario_nombre)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/consultas/{id_consulta}/vacunas-aplicadas",
+    response_model=list[VacunaAplicadaRespuesta],
+    status_code=status.HTTP_201_CREATED,
+)
+def registrar_vacunas_aplicadas_consulta(
+    id_consulta: int,
+    datos: RegistrarVacunasAplicadasPeticion,
+    usuario_actual: dict = Depends(requerir_rol(["veterinario", "admin"])),
+):
+    try:
+        return servicio_consultas.registrar_vacunas_en_consulta(
+            id_consulta=id_consulta,
+            vacunas=datos.vacunas,
+            id_turno=datos.id_turno,
         )
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+# --- ÓRDENES DE DERIVACIÓN ---
 @router.post(
     "/ordenes-derivacion",
     response_model=OrdenDerivacionRespuesta,
@@ -67,20 +120,14 @@ def emitir_orden_derivacion(datos: OrdenDerivacionCrear):
         return servicio_consultas.emitir_orden_derivacion(datos)
     except KeyError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get(
     "/ordenes-derivacion",
-    response_model=list[OrdenDerivacionRespuesta],
-    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
+    dependencies=[Depends(requerir_rol(["veterinario", "admin", "laboratorio"]))],
 )
 def listar_ordenes_derivacion():
     return servicio_consultas.listar_ordenes()
 
-@router.get(
-    "/tipos-analisis",
-    dependencies=[Depends(requerir_rol(["veterinario", "admin"]))],
-)
-def obtener_tipos_analisis():
-    """Devuelve la lista de análisis disponibles en el laboratorio central."""
-    return servicio_consultas.listar_tipos_analisis()

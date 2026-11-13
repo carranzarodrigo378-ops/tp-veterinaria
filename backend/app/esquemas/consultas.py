@@ -1,11 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from app.esquemas.vacuna import VacunaAplicadaCrear
 
 
 class ConsultaMedicaCrear(BaseModel):
     id_mascota: int
+    id_turno: int | None = None
     motivo: str
     diagnostico_preliminar: str
     esquema_vacunas_al_dia: bool = True  # Regla: control de vacunas obligatorias
+    vacunas_aplicadas: list[VacunaAplicadaCrear] = Field(default_factory=list)
 
 
 class ConsultaActualizar(BaseModel):
